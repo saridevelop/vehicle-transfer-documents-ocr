@@ -245,13 +245,13 @@ export default function EditableForm({
         <h3 className="text-lg font-semibold text-blue-900 mb-4">📄 Documentos disponibles para descarga</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div className="bg-white p-4 rounded-lg border">
-            <h4 className="font-medium text-gray-900 mb-2">📋 Contrato de Compraventa</h4>
+            <h4 className="font-medium text-gray-900 mb-2">� Contrato de Compraventa</h4>
             <p className="text-sm text-gray-600 mb-2">
               Documento legal para la venta entre particulares. Incluye datos del vendedor, comprador y vehículo.
             </p>
-            <div className="text-xs text-blue-600 mb-3 flex items-center">
-              <span className="mr-1">ℹ️</span>
-              <span>Generado automáticamente con tus datos</span>
+            <div className="text-xs text-green-600 mb-3 flex items-center">
+              <span className="mr-1">✅</span>
+              <span>Formulario oficial rellenado automáticamente</span>
             </div>
             <button
               onClick={() => onGeneratePDFs('contract')}
