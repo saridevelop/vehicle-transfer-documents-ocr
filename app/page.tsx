@@ -5,6 +5,7 @@ import UploadBox from '@/components/UploadBox'
 import EditableForm from '@/components/EditableForm'
 import ProcessingStep from '@/components/ProcessingStep'
 import { DocumentData } from '@/lib/types'
+import { FileText, RefreshCw, Share2 } from 'lucide-react'
 
 export default function Home() {
   const [step, setStep] = useState(1)
@@ -126,56 +127,81 @@ export default function Home() {
     }
   }
 
+  const handleShare = () => {
+    const encodedData = btoa(JSON.stringify(documentData))
+    const url = `${window.location.origin}?data=${encodedData}`
+    navigator.clipboard.writeText(url)
+    alert('✅ Enlace para compartir copiado al portapapeles')
+  }
+
   return (
-    <div className="max-w-4xl mx-auto">
-      <header className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          🚗 Transferencia de Vehículos OCR
-        </h1>
-        <p className="text-xl text-gray-600">
-          Automatiza el llenado de documentos de transferencia usando OCR
-        </p>
-        {step > 1 && (
-          <button
-            onClick={handleReset}
-            className="mt-4 text-sm text-blue-600 hover:text-blue-800 underline"
-          >
-            🔄 Empezar de nuevo
-          </button>
-        )}
-      </header>
-
-      <ProcessingStep currentStep={step} />
-
-      {/* Debug info - show current data */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-4 mb-8 p-4 bg-gray-100 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Debug - Datos actuales:</h3>
-          <pre className="text-xs text-gray-600 overflow-auto">
-            {JSON.stringify(documentData, null, 2)}
-          </pre>
-        </div>
-      )}
-
-      <div className="mt-8">
-        {step === 1 && (
-          <UploadBox onFilesUploaded={handleFilesUploaded} />
-        )}
-
-        {step === 2 && (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-lg text-gray-600">Procesando documentos con OCR...</p>
+    <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto">
+        <header className="text-center mb-12">
+          <div className="inline-block bg-primary text-primary-foreground p-3 rounded-lg mb-4">
+            <FileText size={40} />
           </div>
-        )}
+          <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+            Generador de Documentos de Vehículos
+          </h1>
+          <p className="mt-3 text-lg text-muted-foreground sm:mt-4">
+            Automatiza el llenado de documentos de transferencia usando la magia del OCR.
+          </p>
+          <div className="mt-6 flex gap-2 justify-center">
+            {step > 1 && (
+              <button
+                onClick={handleReset}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-secondary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" /> Empezar de nuevo
+              </button>
+            )}
+            {step === 3 && (
+               <button
+                onClick={handleShare}
+                className="inline-flex items-center px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground text-sm font-medium rounded-md"
+              >
+                <Share2 className="mr-2 h-4 w-4" /> Compartir
+              </button>
+            )}
+          </div>
+        </header>
 
-        {step === 3 && (
-          <EditableForm
-            data={documentData}
-            onDataUpdate={handleDataUpdate}
-            onGeneratePDFs={handleGeneratePDFs}
-            isProcessing={isProcessing}
-          />
+        <main>
+          <ProcessingStep currentStep={step} />
+
+          <div className="mt-10">
+            {step === 1 && (
+              <UploadBox onFilesUploaded={handleFilesUploaded} />
+            )}
+
+            {step === 2 && (
+              <div className="text-center py-12">
+                <div className="animate-spin-slow rounded-full h-16 w-16 border-t-2 border-b-2 border-primary mx-auto mb-6"></div>
+                <p className="text-xl font-medium text-foreground">Procesando documentos...</p>
+                <p className="text-muted-foreground mt-2">Esto puede tardar unos segundos. Estamos extrayendo la información.</p>
+              </div>
+            )}
+
+            {step === 3 && (
+              <EditableForm
+                data={documentData}
+                onDataUpdate={handleDataUpdate}
+                onGeneratePDFs={handleGeneratePDFs}
+                isProcessing={isProcessing}
+              />
+            )}
+          </div>
+        </main>
+        
+        {/* Debug info - show current data */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-12 p-4 bg-muted/50 rounded-lg">
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">Debug - Datos actuales:</h3>
+            <pre className="text-xs text-muted-foreground/80 overflow-auto max-h-60">
+              {JSON.stringify(documentData, null, 2)}
+            </pre>
+          </div>
         )}
       </div>
     </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Upload, User, Car } from 'lucide-react'
+import { Upload, User, Car, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
 interface UploadBoxProps {
   onFilesUploaded: (files: {
@@ -48,7 +48,8 @@ export default function UploadBox({ onFilesUploaded }: UploadBoxProps) {
     icon: React.ComponentType<any>, 
     file?: File 
   }) => (
-    <div className="border-2 border-dashed rounded-lg p-6 text-center transition-colors hover:border-gray-400">
+    <div className={`relative rounded-xl border-2 border-dashed p-6 text-center transition-all duration-300
+      ${file ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-accent'}`}>
       <input
         type="file"
         accept="image/*"
@@ -60,18 +61,19 @@ export default function UploadBox({ onFilesUploaded }: UploadBoxProps) {
         id={`file-${type}`}
       />
       <label htmlFor={`file-${type}`} className="cursor-pointer block">
-        <Icon className={`mx-auto h-12 w-12 mb-4 ${
-          file ? 'text-green-500' : 'text-gray-400'
+        <Icon className={`mx-auto h-12 w-12 mb-4 transition-colors ${
+          file ? 'text-primary' : 'text-muted-foreground'
         }`} />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">{title}</h3>
-        <p className="text-sm text-gray-600 mb-2">{description}</p>
+        <h3 className="text-lg font-semibold text-foreground mb-1">{title}</h3>
+        <p className="text-sm text-muted-foreground mb-3">{description}</p>
         {file ? (
-          <p className="text-sm text-green-600 font-medium">
-            ✓ {file.name}
-          </p>
+          <div className="inline-flex items-center justify-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700 dark:bg-green-900/50 dark:text-green-300">
+            <CheckCircle2 className="mr-2 h-4 w-4" />
+            {file.name}
+          </div>
         ) : (
-          <p className="text-sm text-gray-500">
-            Haz clic para seleccionar una imagen
+          <p className="text-sm text-muted-foreground">
+            Haz clic o arrastra para subir
           </p>
         )}
       </label>
@@ -79,13 +81,13 @@ export default function UploadBox({ onFilesUploaded }: UploadBoxProps) {
   )
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto">
       <div className="mb-8 text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          Sube los documentos necesarios
+        <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          Sube los Documentos
         </h2>
-        <p className="text-gray-600">
-          Sube las imágenes de los documentos para extraer automáticamente la información
+        <p className="mt-2 text-lg text-muted-foreground">
+          Necesitamos imágenes claras del DNI/NIE y la Ficha Técnica.
         </p>
       </div>
 
@@ -119,21 +121,28 @@ export default function UploadBox({ onFilesUploaded }: UploadBoxProps) {
         <button
           onClick={handleSubmit}
           disabled={Object.keys(files).length === 0}
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-lg transition-colors"
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8"
         >
-          <Upload className="inline h-5 w-5 mr-2" />
+          <Upload className="mr-2 h-5 w-5" />
           Procesar Documentos
         </button>
       </div>
 
-      <div className="mt-8 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h3 className="font-medium text-yellow-800 mb-2">💡 Consejos para mejores resultados:</h3>
-        <ul className="text-sm text-yellow-700 space-y-1">
-          <li>• Asegúrate de que las imágenes estén bien iluminadas</li>
-          <li>• Evita sombras o reflejos en los documentos</li>
-          <li>• Mantén los documentos planos y sin arrugas</li>
-          <li>• La resolución debe ser suficiente para leer el texto claramente</li>
-        </ul>
+      <div className="mt-10 bg-accent/50 border-l-4 border-accent-foreground rounded-r-lg p-4">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <AlertTriangle className="h-5 w-5 text-accent-foreground" aria-hidden="true" />
+          </div>
+          <div className="ml-3">
+            <h3 className="font-medium text-accent-foreground mb-2">Consejos para mejores resultados</h3>
+            <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+              <li>Asegúrate de que las imágenes estén bien iluminadas y enfocadas.</li>
+              <li>Evita sombras o reflejos en los documentos.</li>
+              <li>Coloca los documentos sobre una superficie plana y oscura.</li>
+              <li>La resolución debe ser suficiente para leer el texto claramente.</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   )

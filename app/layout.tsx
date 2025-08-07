@@ -1,7 +1,12 @@
 import './globals.css'
-import { Inter } from 'next/font/google'
+import { Inter as FontSans } from 'next/font/google'
+import { cn } from '@/lib/utils'
+import Script from 'next/script'
 
-const inter = Inter({ subsets: ['latin'] })
+const fontSans = FontSans({ 
+  subsets: ['latin'],
+  variable: "--font-sans",
+})
 
 export const metadata = {
   title: 'Transferencia de Vehículos OCR',
@@ -14,10 +19,25 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es">
-      <body className={inter.className}>
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-          <main className="container mx-auto px-4 py-8">
+    <html lang="es" suppressHydrationWarning>
+      <body className={cn(
+        "min-h-screen bg-background font-sans antialiased",
+        fontSans.variable
+      )}>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-CQ4VNTYJSJ"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-CQ4VNTYJSJ');
+          `}
+        </Script>
+        <div className="relative flex min-h-screen flex-col">
+          <main className="flex-1">
             {children}
           </main>
         </div>
