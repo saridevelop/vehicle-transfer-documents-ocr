@@ -74,3 +74,46 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile-specific improvements */
+@layer utilities {
+  /* Prevent viewport zoom on input focus for iOS */
+  @media screen and (max-width: 768px) {
+    input[type="text"], 
+    input[type="email"], 
+    input[type="tel"], 
+    input[type="url"], 
+    input[type="search"], 
+    textarea, 
+    select {
+      font-size: 16px !important;
+      transform: translateZ(0);
+      transition: none;
+    }
+  }
+
+  /* Improve touch targets on mobile */
+  @media (hover: none) and (pointer: coarse) {
+    button {
+      min-height: 44px;
+    }
+    
+    input, select, textarea {
+      min-height: 44px;
+    }
+  }
+
+  /* Prevent layout shifts during keyboard events */
+  .mobile-form-container {
+    position: relative;
+    contain: layout style;
+  }
+
+  /* Smooth input transitions without layout shifts */
+  .stable-input {
+    will-change: auto;
+    backface-visibility: hidden;
+    perspective: 1000px;
+    transform: translateZ(0);
+  }
+}

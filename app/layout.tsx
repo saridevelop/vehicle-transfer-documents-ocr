@@ -13,6 +13,14 @@ export const metadata = {
   description: 'Aplicación para automatizar documentos de transferencia de vehículos usando OCR',
 }
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+}
+
 export default function RootLayout({
   children,
 }: {

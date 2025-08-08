@@ -147,11 +147,11 @@ export default function Home() {
           <p className="mt-3 text-lg text-muted-foreground sm:mt-4">
             Automatiza el llenado de documentos de transferencia usando la magia del OCR.
           </p>
-          <div className="mt-6 flex gap-2 justify-center">
+          <div className="mt-6 flex gap-2 justify-center flex-wrap">
             {step > 1 && (
               <button
                 onClick={handleReset}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-secondary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-secondary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary min-h-[44px] touch-manipulation"
               >
                 <RefreshCw className="mr-2 h-4 w-4" /> Empezar de nuevo
               </button>
@@ -159,7 +159,7 @@ export default function Home() {
             {step === 3 && (
                <button
                 onClick={handleShare}
-                className="inline-flex items-center px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground text-sm font-medium rounded-md"
+                className="inline-flex items-center px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground text-sm font-medium rounded-md min-h-[44px] touch-manipulation"
               >
                 <Share2 className="mr-2 h-4 w-4" /> Compartir
               </button>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Upload, User, Car, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Upload, User, Car, AlertTriangle, CheckCircle2, Camera } from 'lucide-react'
 
 interface UploadBoxProps {
   onFilesUploaded: (files: {
@@ -53,6 +53,7 @@ export default function UploadBox({ onFilesUploaded }: UploadBoxProps) {
       <input
         type="file"
         accept="image/*"
+        capture="environment"
         onChange={(e) => {
           const selectedFile = e.target.files?.[0] || null
           handleFileChange(type, selectedFile)
@@ -72,9 +73,15 @@ export default function UploadBox({ onFilesUploaded }: UploadBoxProps) {
             {file.name}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            Haz clic o arrastra para subir
-          </p>
+          <div className="space-y-1">
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Camera className="h-4 w-4" />
+              <span>Haz clic para subir archivo</span>
+            </div>
+            <p className="text-xs text-muted-foreground/80">
+              Soporta cámara y galería
+            </p>
+          </div>
         )}
       </label>
     </div>

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { DocumentData } from '@/lib/types'
+import { useMobileInput } from '@/lib/hooks/useMobileInput'
 import { Download, UserCircle, Car, FileSignature } from 'lucide-react'
 
 interface EditableFormProps {
@@ -18,8 +19,28 @@ export default function EditableForm({
   isProcessing 
 }: EditableFormProps) {
   const [editingData, setEditingData] = useState(data)
+  const { createStableInputHandler, handleInputFocus, handleInputBlur } = useMobileInput()
 
-  const handleInputChange = (
+  // Debounce function to prevent excessive updates
+  const debounceUpdate = useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout
+      return (newData: DocumentData) => {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(() => {
+          onDataUpdate(newData)
+        }, 300) // 300ms debounce
+      }
+    })(),
+    [onDataUpdate]
+  )
+
+  // Update internal state when external data changes
+  useEffect(() => {
+    setEditingData(data)
+  }, [data])
+
+  const handleInputChange = useCallback((
     section: 'vendedor' | 'comprador' | 'vehiculo',
     field: string,
     value: string
@@ -32,8 +53,8 @@ export default function EditableForm({
       }
     }
     setEditingData(newData)
-    onDataUpdate(newData)
-  }
+    debounceUpdate(newData)
+  }, [editingData, debounceUpdate])
 
   const FormSection = ({ title, icon: Icon, children }: { 
     title: string, 
@@ -70,14 +91,19 @@ export default function EditableForm({
         type="text"
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={handleInputFocus}
+        onBlur={handleInputBlur}
         placeholder={placeholder}
-        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-none stable-input"
+        autoComplete="off"
+        spellCheck="false"
+        inputMode="text"
       />
     </div>
   )
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto mobile-form-container">
       <div className="mb-10 text-center">
         <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
           Revisa y Edita la Información
@@ -204,7 +230,7 @@ export default function EditableForm({
             <button
               onClick={() => onGeneratePDFs('contract')}
               disabled={isProcessing}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full min-h-[44px] touch-manipulation"
             >
               <Download className="h-4 w-4 mr-2" />
               {isProcessing ? 'Generando...' : 'Descargar Contrato'}
@@ -220,7 +246,7 @@ export default function EditableForm({
             <button
               onClick={() => onGeneratePDFs('mod02')}
               disabled={isProcessing}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 w-full"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 w-full min-h-[44px] touch-manipulation"
             >
               <Download className="h-4 w-4 mr-2" />
               {isProcessing ? 'Generando...' : 'Descargar Mod.02-ES'}
