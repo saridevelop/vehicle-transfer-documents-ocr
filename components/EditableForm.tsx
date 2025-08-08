@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useDebounce } from 'use-debounce'
 import { DocumentData } from '@/lib/types'
 import { useMobileInput } from '@/lib/hooks/useMobileInput'
 import { Download, UserCircle, Car, FileSignature } from 'lucide-react'
@@ -18,45 +19,58 @@ export default function EditableForm({
   onGeneratePDFs, 
   isProcessing 
 }: EditableFormProps) {
-  const [editingData, setEditingData] = useState(data)
-  const { createStableInputHandler, handleInputFocus, handleInputBlur } = useMobileInput()
+  const [formData, setFormData] = useState(data)
+  const isUserEditingRef = useRef(false)
+  const prevDataRef = useRef(data)
 
-  // Debounce function to prevent excessive updates
-  const debounceUpdate = useCallback(
-    (() => {
-      let timeoutId: NodeJS.Timeout
-      return (newData: DocumentData) => {
-        clearTimeout(timeoutId)
-        timeoutId = setTimeout(() => {
-          onDataUpdate(newData)
-        }, 300) // 300ms debounce
-      }
-    })(),
-    [onDataUpdate]
-  )
+  // Usar hook personalizado para mejor experiencia móvil
+  const { handleInputFocus, handleInputBlur } = useMobileInput()
 
-  // Update internal state when external data changes
+  // Usar use-debounce para manejo profesional del debounce
+  const [debouncedFormData] = useDebounce(formData, 500)
+
+  // Solo actualizar formData si los datos vienen de fuera (OCR) y el usuario no está editando
   useEffect(() => {
-    setEditingData(data)
+    // Si el usuario está escribiendo, no actualizar
+    if (isUserEditingRef.current) {
+      return
+    }
+
+    // Solo actualizar si realmente cambiaron los datos
+    if (JSON.stringify(data) !== JSON.stringify(prevDataRef.current)) {
+      setFormData(data)
+      prevDataRef.current = data
+    }
   }, [data])
 
-  const handleInputChange = useCallback((
-    section: 'vendedor' | 'comprador' | 'vehiculo',
+  // Efecto para enviar los datos al padre cuando se terminan de editar
+  useEffect(() => {
+    // Solo enviar si el usuario ha editado algo
+    if (isUserEditingRef.current && debouncedFormData) {
+      onDataUpdate(debouncedFormData)
+      isUserEditingRef.current = false
+    }
+  }, [debouncedFormData, onDataUpdate])
+
+  // Handler optimizado que previene re-renders innecesarios
+  const handleFieldChange = useCallback((
+    section: keyof DocumentData,
     field: string,
     value: string
   ) => {
-    const newData = {
-      ...editingData,
+    isUserEditingRef.current = true
+    
+    setFormData(prevData => ({
+      ...prevData,
       [section]: {
-        ...editingData[section],
+        ...prevData[section],
         [field]: value
       }
-    }
-    setEditingData(newData)
-    debounceUpdate(newData)
-  }, [editingData, debounceUpdate])
+    }))
+  }, [])
 
-  const FormSection = ({ title, icon: Icon, children }: { 
+  // Componente FormSection memoizado para evitar re-renders
+  const FormSection = useCallback(({ title, icon: Icon, children }: { 
     title: string, 
     icon: React.ElementType, 
     children: React.ReactNode 
@@ -70,37 +84,142 @@ export default function EditableForm({
         {children}
       </div>
     </div>
-  )
+  ), [])
 
-  const InputField = ({ 
+  // Componente Input profesional con estabilidad garantizada
+  const InputField = useCallback(({ 
     label, 
     value, 
     onChange, 
-    placeholder = '' 
+    placeholder = '',
+    type = 'text',
+    id
   }: { 
-    label: string, 
-    value: string, 
-    onChange: (value: string) => void,
-    placeholder?: string 
-  }) => (
-    <div>
-      <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-        {label}
-      </label>
-      <input
-        type="text"
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={handleInputFocus}
-        onBlur={handleInputBlur}
-        placeholder={placeholder}
-        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-none stable-input"
-        autoComplete="off"
-        spellCheck="false"
-        inputMode="text"
-      />
-    </div>
-  )
+    label: string
+    value: string
+    onChange: (value: string) => void
+    placeholder?: string
+    type?: string
+    id: string
+  }) => {
+    const inputRef = useRef<HTMLInputElement>(null)
+    
+    // Memoizar handlers para evitar re-renders
+    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+      e.preventDefault()
+      onChange(e.target.value)
+    }, [onChange])
+
+    return (
+      <div className="space-y-2">
+        <label 
+          htmlFor={id}
+          className="block text-sm font-medium text-muted-foreground"
+        >
+          {label}
+        </label>
+        <input
+          ref={inputRef}
+          id={id}
+          type={type}
+          value={value || ''}
+          onChange={handleChange}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+          placeholder={placeholder}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+          autoComplete="off"
+          spellCheck="false"
+        />
+      </div>
+    )
+  }, [handleInputFocus, handleInputBlur])
+
+  // Componente DateField profesional con estabilidad garantizada
+  const DateField = useCallback(({ 
+    label, 
+    value, 
+    onChange,
+    id
+  }: { 
+    label: string
+    value: string
+    onChange: (value: string) => void
+    id: string
+  }) => {
+    const dateRef = useRef<HTMLInputElement>(null)
+
+    // Memoizar conversores para evitar recálculos
+    const toInputFormat = useCallback((dateStr: string): string => {
+      if (!dateStr || dateStr.length < 10) return ''
+      const parts = dateStr.split('/')
+      if (parts.length === 3) {
+        const [day, month, year] = parts
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+      }
+      return ''
+    }, [])
+
+    const toDisplayFormat = useCallback((dateStr: string): string => {
+      if (!dateStr) return ''
+      const [year, month, day] = dateStr.split('-')
+      return `${day}/${month}/${year}`
+    }, [])
+
+    const handleDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+      e.preventDefault()
+      const inputValue = e.target.value
+      const displayValue = inputValue ? toDisplayFormat(inputValue) : ''
+      onChange(displayValue)
+    }, [onChange, toDisplayFormat])
+
+    return (
+      <div className="space-y-2">
+        <label 
+          htmlFor={id}
+          className="block text-sm font-medium text-muted-foreground"
+        >
+          {label}
+        </label>
+        <input
+          ref={dateRef}
+          id={id}
+          type="date"
+          value={toInputFormat(value)}
+          onChange={handleDateChange}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+        />
+      </div>
+    )
+  }, [handleInputFocus, handleInputBlur])
+
+  // Memoizar handlers específicos para evitar re-renders
+  const vendedorHandlers = useMemo(() => ({
+    nombre: (value: string) => handleFieldChange('vendedor', 'nombre', value),
+    dni: (value: string) => handleFieldChange('vendedor', 'dni', value),
+    fechaNacimiento: (value: string) => handleFieldChange('vendedor', 'fechaNacimiento', value),
+    direccion: (value: string) => handleFieldChange('vendedor', 'direccion', value),
+  }), [handleFieldChange])
+
+  const compradorHandlers = useMemo(() => ({
+    nombre: (value: string) => handleFieldChange('comprador', 'nombre', value),
+    dni: (value: string) => handleFieldChange('comprador', 'dni', value),
+    fechaNacimiento: (value: string) => handleFieldChange('comprador', 'fechaNacimiento', value),
+    direccion: (value: string) => handleFieldChange('comprador', 'direccion', value),
+  }), [handleFieldChange])
+
+  const vehiculoHandlers = useMemo(() => ({
+    marca: (value: string) => handleFieldChange('vehiculo', 'marca', value),
+    modelo: (value: string) => handleFieldChange('vehiculo', 'modelo', value),
+    matricula: (value: string) => handleFieldChange('vehiculo', 'matricula', value),
+    bastidor: (value: string) => handleFieldChange('vehiculo', 'bastidor', value),
+    fechaMatriculacion: (value: string) => handleFieldChange('vehiculo', 'fechaMatriculacion', value),
+    tipoVehiculo: (value: string) => handleFieldChange('vehiculo', 'tipoVehiculo', value),
+    potencia: (value: string) => handleFieldChange('vehiculo', 'potencia', value),
+    cilindrada: (value: string) => handleFieldChange('vehiculo', 'cilindrada', value),
+  }), [handleFieldChange])
 
   return (
     <div className="w-full max-w-4xl mx-auto mobile-form-container">
@@ -115,105 +234,118 @@ export default function EditableForm({
 
       <FormSection title="Datos del Vendedor" icon={UserCircle}>
         <InputField
+          id="vendedor-nombre"
           label="Nombre completo"
-          value={editingData.vendedor.nombre || ''}
-          onChange={(value) => handleInputChange('vendedor', 'nombre', value)}
+          value={formData.vendedor.nombre || ''}
+          onChange={vendedorHandlers.nombre}
           placeholder="Nombre y apellidos del vendedor"
         />
         <InputField
+          id="vendedor-dni"
           label="DNI/NIE"
-          value={editingData.vendedor.dni || ''}
-          onChange={(value) => handleInputChange('vendedor', 'dni', value)}
+          value={formData.vendedor.dni || ''}
+          onChange={vendedorHandlers.dni}
           placeholder="12345678A"
         />
-        <InputField
+        <DateField
+          id="vendedor-fechaNacimiento"
           label="Fecha de nacimiento"
-          value={editingData.vendedor.fechaNacimiento || ''}
-          onChange={(value) => handleInputChange('vendedor', 'fechaNacimiento', value)}
-          placeholder="DD/MM/AAAA"
+          value={formData.vendedor.fechaNacimiento || ''}
+          onChange={vendedorHandlers.fechaNacimiento}
         />
         <InputField
+          id="vendedor-direccion"
           label="Dirección"
-          value={editingData.vendedor.direccion || ''}
-          onChange={(value) => handleInputChange('vendedor', 'direccion', value)}
+          value={formData.vendedor.direccion || ''}
+          onChange={vendedorHandlers.direccion}
           placeholder="Dirección completa"
         />
       </FormSection>
 
       <FormSection title="Datos del Comprador" icon={UserCircle}>
         <InputField
+          id="comprador-nombre"
           label="Nombre completo"
-          value={editingData.comprador.nombre || ''}
-          onChange={(value) => handleInputChange('comprador', 'nombre', value)}
+          value={formData.comprador.nombre || ''}
+          onChange={compradorHandlers.nombre}
           placeholder="Nombre y apellidos del comprador"
         />
         <InputField
+          id="comprador-dni"
           label="DNI/NIE"
-          value={editingData.comprador.dni || ''}
-          onChange={(value) => handleInputChange('comprador', 'dni', value)}
+          value={formData.comprador.dni || ''}
+          onChange={compradorHandlers.dni}
           placeholder="12345678A"
         />
-        <InputField
+        <DateField
+          id="comprador-fechaNacimiento"
           label="Fecha de nacimiento"
-          value={editingData.comprador.fechaNacimiento || ''}
-          onChange={(value) => handleInputChange('comprador', 'fechaNacimiento', value)}
-          placeholder="DD/MM/AAAA"
+          value={formData.comprador.fechaNacimiento || ''}
+          onChange={compradorHandlers.fechaNacimiento}
         />
         <InputField
+          id="comprador-direccion"
           label="Dirección"
-          value={editingData.comprador.direccion || ''}
-          onChange={(value) => handleInputChange('comprador', 'direccion', value)}
+          value={formData.comprador.direccion || ''}
+          onChange={compradorHandlers.direccion}
           placeholder="Dirección completa"
         />
       </FormSection>
 
       <FormSection title="Datos del Vehículo" icon={Car}>
         <InputField
+          id="vehiculo-marca"
           label="Marca"
-          value={editingData.vehiculo.marca || ''}
-          onChange={(value) => handleInputChange('vehiculo', 'marca', value)}
+          value={formData.vehiculo.marca || ''}
+          onChange={vehiculoHandlers.marca}
           placeholder="Ej: Toyota, Volkswagen"
         />
         <InputField
+          id="vehiculo-modelo"
           label="Modelo"
-          value={editingData.vehiculo.modelo || ''}
-          onChange={(value) => handleInputChange('vehiculo', 'modelo', value)}
+          value={formData.vehiculo.modelo || ''}
+          onChange={vehiculoHandlers.modelo}
           placeholder="Ej: Corolla, Golf"
         />
         <InputField
+          id="vehiculo-matricula"
           label="Matrícula"
-          value={editingData.vehiculo.matricula || ''}
-          onChange={(value) => handleInputChange('vehiculo', 'matricula', value)}
+          value={formData.vehiculo.matricula || ''}
+          onChange={vehiculoHandlers.matricula}
           placeholder="1234ABC"
         />
         <InputField
+          id="vehiculo-bastidor"
           label="Número de bastidor (VIN)"
-          value={editingData.vehiculo.bastidor || ''}
-          onChange={(value) => handleInputChange('vehiculo', 'bastidor', value)}
+          value={formData.vehiculo.bastidor || ''}
+          onChange={vehiculoHandlers.bastidor}
           placeholder="VIN del vehículo"
         />
-        <InputField
+        <DateField
+          id="vehiculo-fechaMatriculacion"
           label="Fecha de matriculación"
-          value={editingData.vehiculo.fechaMatriculacion || ''}
-          onChange={(value) => handleInputChange('vehiculo', 'fechaMatriculacion', value)}
-          placeholder="DD/MM/AAAA"
+          value={formData.vehiculo.fechaMatriculacion || ''}
+          onChange={vehiculoHandlers.fechaMatriculacion}
         />
         <InputField
+          id="vehiculo-tipoVehiculo"
           label="Tipo de vehículo"
-          value={editingData.vehiculo.tipoVehiculo || ''}
-          onChange={(value) => handleInputChange('vehiculo', 'tipoVehiculo', value)}
+          value={formData.vehiculo.tipoVehiculo || ''}
+          onChange={vehiculoHandlers.tipoVehiculo}
           placeholder="Ej: Turismo, Furgón"
         />
         <InputField
+          id="vehiculo-potencia"
           label="Potencia (CV)"
-          value={editingData.vehiculo.potencia || ''}
-          onChange={(value) => handleInputChange('vehiculo', 'potencia', value)}
+          value={formData.vehiculo.potencia || ''}
+          onChange={vehiculoHandlers.potencia}
           placeholder="Ej: 110"
         />
         <InputField
+          id="vehiculo-cilindrada"
           label="Cilindrada (cm³)"
-          value={editingData.vehiculo.cilindrada || ''}
-          onChange={(value) => handleInputChange('vehiculo', 'cilindrada', value)}
+          value={formData.vehiculo.cilindrada || ''}
+          onChange={vehiculoHandlers.cilindrada}
           placeholder="Ej: 1598"
         />
       </FormSection>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Upload, User, Car, AlertTriangle, CheckCircle2, Camera } from 'lucide-react'
+import { Upload, User, Car, AlertTriangle, CheckCircle2, Camera, Edit } from 'lucide-react'
 
 interface UploadBoxProps {
   onFilesUploaded: (files: {
@@ -9,9 +9,10 @@ interface UploadBoxProps {
     comprador?: File,
     ficha?: File
   }) => void
+  onManualFill: () => void
 }
 
-export default function UploadBox({ onFilesUploaded }: UploadBoxProps) {
+export default function UploadBox({ onFilesUploaded, onManualFill }: UploadBoxProps) {
   const [files, setFiles] = useState<{
     vendedor?: File,
     comprador?: File,
@@ -48,12 +49,11 @@ export default function UploadBox({ onFilesUploaded }: UploadBoxProps) {
     icon: React.ComponentType<any>, 
     file?: File 
   }) => (
-    <div className={`relative rounded-xl border-2 border-dashed p-6 text-center transition-all duration-300
-      ${file ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-accent'}`}>
+    <div className={`relative rounded-xl border-2 border-dashed p-6 text-center transition-all duration-300 min-h-[200px] touch-manipulation
+      ${file ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-accent active:bg-accent/80'}`}>
       <input
         type="file"
         accept="image/*"
-        capture="environment"
         onChange={(e) => {
           const selectedFile = e.target.files?.[0] || null
           handleFileChange(type, selectedFile)
@@ -61,16 +61,16 @@ export default function UploadBox({ onFilesUploaded }: UploadBoxProps) {
         className="hidden"
         id={`file-${type}`}
       />
-      <label htmlFor={`file-${type}`} className="cursor-pointer block">
+      <label htmlFor={`file-${type}`} className="cursor-pointer block h-full flex flex-col justify-center min-h-[148px]">
         <Icon className={`mx-auto h-12 w-12 mb-4 transition-colors ${
           file ? 'text-primary' : 'text-muted-foreground'
         }`} />
         <h3 className="text-lg font-semibold text-foreground mb-1">{title}</h3>
         <p className="text-sm text-muted-foreground mb-3">{description}</p>
         {file ? (
-          <div className="inline-flex items-center justify-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700 dark:bg-green-900/50 dark:text-green-300">
-            <CheckCircle2 className="mr-2 h-4 w-4" />
-            {file.name}
+          <div className="inline-flex items-center justify-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700 dark:bg-green-900/50 dark:text-green-300 mx-auto max-w-full">
+            <CheckCircle2 className="mr-2 h-4 w-4 flex-shrink-0" />
+            <span className="truncate">{file.name}</span>
           </div>
         ) : (
           <div className="space-y-1">
@@ -124,14 +124,28 @@ export default function UploadBox({ onFilesUploaded }: UploadBoxProps) {
         />
       </div>
 
-      <div className="text-center">
+      <div className="text-center space-y-4">
         <button
           onClick={handleSubmit}
           disabled={Object.keys(files).length === 0}
-          className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8"
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8 min-h-[44px] touch-manipulation"
         >
           <Upload className="mr-2 h-5 w-5" />
           Procesar Documentos
+        </button>
+        
+        <div className="flex items-center gap-4">
+          <div className="flex-1 h-px bg-border"></div>
+          <span className="text-sm text-muted-foreground">o</span>
+          <div className="flex-1 h-px bg-border"></div>
+        </div>
+        
+        <button
+          onClick={onManualFill}
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-11 px-8 min-h-[44px] touch-manipulation"
+        >
+          <Edit className="mr-2 h-5 w-5" />
+          Rellenar Manualmente
         </button>
       </div>
 

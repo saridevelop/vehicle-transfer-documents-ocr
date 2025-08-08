@@ -127,6 +127,16 @@ export default function Home() {
     }
   }
 
+  const handleManualFill = () => {
+    // Ir directamente al formulario con datos vacíos
+    setDocumentData({
+      vendedor: {},
+      comprador: {},
+      vehiculo: {}
+    })
+    setStep(3)
+  }
+
   const handleShare = () => {
     const encodedData = btoa(JSON.stringify(documentData))
     const url = `${window.location.origin}?data=${encodedData}`
@@ -142,10 +152,10 @@ export default function Home() {
             <FileText size={40} />
           </div>
           <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-            Generador de Documentos de Vehículos
+            Generador de Documentos de Transferencia de Vehículos
           </h1>
           <p className="mt-3 text-lg text-muted-foreground sm:mt-4">
-            Automatiza el llenado de documentos de transferencia usando la magia del OCR.
+            Automatiza el llenado de documentos de transferencia usando la magia del OCR con IA.
           </p>
           <div className="mt-6 flex gap-2 justify-center flex-wrap">
             {step > 1 && (
@@ -172,7 +182,10 @@ export default function Home() {
 
           <div className="mt-10">
             {step === 1 && (
-              <UploadBox onFilesUploaded={handleFilesUploaded} />
+              <UploadBox 
+                onFilesUploaded={handleFilesUploaded} 
+                onManualFill={handleManualFill}
+              />
             )}
 
             {step === 2 && (
