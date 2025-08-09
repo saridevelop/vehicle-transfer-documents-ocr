@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Upload, User, Car, AlertTriangle, CheckCircle2, Camera, Edit } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Upload, User, Car, AlertTriangle, CheckCircle2, Camera, Edit, ImageIcon, FileImage, X } from 'lucide-react'
 
 interface UploadBoxProps {
   onFilesUploaded: (files: {
@@ -18,6 +18,10 @@ export default function UploadBox({ onFilesUploaded, onManualFill }: UploadBoxPr
     comprador?: File,
     ficha?: File
   }>({})
+  
+  const [showSelector, setShowSelector] = useState<string | null>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (type: 'vendedor' | 'comprador' | 'ficha', file: File | null) => {
     if (file) {
@@ -26,6 +30,35 @@ export default function UploadBox({ onFilesUploaded, onManualFill }: UploadBoxPr
         [type]: file
       }))
     }
+    setShowSelector(null) // Cerrar el selector después de seleccionar
+  }
+
+  const openImageSelector = (type: 'vendedor' | 'comprador' | 'ficha') => {
+    setShowSelector(type)
+  }
+
+  const handleCameraCapture = (type: 'vendedor' | 'comprador' | 'ficha') => {
+    if (cameraInputRef.current) {
+      cameraInputRef.current.setAttribute('data-type', type)
+      cameraInputRef.current.click()
+    }
+  }
+
+  const handleGallerySelect = (type: 'vendedor' | 'comprador' | 'ficha') => {
+    if (galleryInputRef.current) {
+      galleryInputRef.current.setAttribute('data-type', type)
+      galleryInputRef.current.click()
+    }
+  }
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    const type = e.target.getAttribute('data-type') as 'vendedor' | 'comprador' | 'ficha'
+    if (file && type) {
+      handleFileChange(type, file)
+    }
+    // Reset input value para permitir seleccionar el mismo archivo otra vez
+    e.target.value = ''
   }
 
   const handleSubmit = () => {
@@ -35,6 +68,60 @@ export default function UploadBox({ onFilesUploaded, onManualFill }: UploadBoxPr
     }
     onFilesUploaded(files)
   }
+
+  // Componente modal para selector de fuente de imagen
+  const ImageSourceSelector = ({ type, onClose }: { type: string, onClose: () => void }) => (
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-background rounded-t-2xl sm:rounded-2xl shadow-xl max-w-sm w-full mx-4 overflow-hidden transform transition-all duration-300 ease-out"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-6 border-b border-border">
+          <h3 className="text-lg font-semibold text-foreground">Seleccionar imagen</h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-accent rounded-full transition-colors touch-manipulation"
+          >
+            <X className="h-5 w-5 text-muted-foreground" />
+          </button>
+        </div>
+        
+        <div className="p-6 space-y-3">
+          <button
+            onClick={() => handleCameraCapture(type as 'vendedor' | 'comprador' | 'ficha')}
+            className="w-full flex items-center gap-4 p-4 rounded-xl border border-border hover:bg-accent active:bg-accent/80 transition-colors text-left touch-manipulation min-h-[72px]"
+          >
+            <div className="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+              <Camera className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <div className="font-medium text-foreground">Tomar foto</div>
+              <div className="text-sm text-muted-foreground">Usar la cámara del dispositivo</div>
+            </div>
+          </button>
+          
+          <button
+            onClick={() => handleGallerySelect(type as 'vendedor' | 'comprador' | 'ficha')}
+            className="w-full flex items-center gap-4 p-4 rounded-xl border border-border hover:bg-accent active:bg-accent/80 transition-colors text-left touch-manipulation min-h-[72px]"
+          >
+            <div className="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+              <ImageIcon className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <div className="font-medium text-foreground">Elegir de galería</div>
+              <div className="text-sm text-muted-foreground">Seleccionar foto existente</div>
+            </div>
+          </button>
+        </div>
+        
+        {/* Espaciado inferior para móviles */}
+        <div className="h-4 sm:hidden"></div>
+      </div>
+    </div>
+  )
 
   const FileUploadBox = ({ 
     type,
@@ -51,17 +138,11 @@ export default function UploadBox({ onFilesUploaded, onManualFill }: UploadBoxPr
   }) => (
     <div className={`relative rounded-xl border-2 border-dashed p-6 text-center transition-all duration-300 min-h-[200px] touch-manipulation
       ${file ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-accent active:bg-accent/80'}`}>
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const selectedFile = e.target.files?.[0] || null
-          handleFileChange(type, selectedFile)
-        }}
-        className="hidden"
-        id={`file-${type}`}
-      />
-      <label htmlFor={`file-${type}`} className="cursor-pointer block h-full flex flex-col justify-center min-h-[148px]">
+      
+      <button
+        onClick={() => openImageSelector(type)}
+        className="cursor-pointer block h-full w-full flex flex-col justify-center min-h-[148px] text-center"
+      >
         <Icon className={`mx-auto h-12 w-12 mb-4 transition-colors ${
           file ? 'text-primary' : 'text-muted-foreground'
         }`} />
@@ -73,22 +154,47 @@ export default function UploadBox({ onFilesUploaded, onManualFill }: UploadBoxPr
             <span className="truncate">{file.name}</span>
           </div>
         ) : (
-          <div className="space-y-1">
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <div className="space-y-2">
+            <div className="flex items-center justify-center gap-2 text-sm text-primary font-medium">
               <Camera className="h-4 w-4" />
-              <span>Haz clic para subir archivo</span>
+              <span>Toca para elegir</span>
             </div>
             <p className="text-xs text-muted-foreground/80">
-              Soporta cámara y galería
+              Cámara o galería
             </p>
           </div>
         )}
-      </label>
+      </button>
     </div>
   )
 
   return (
     <div className="w-full max-w-4xl mx-auto">
+      {/* Inputs ocultos para cámara y galería */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileInputChange}
+        className="hidden"
+      />
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileInputChange}
+        className="hidden"
+      />
+
+      {/* Modal selector de fuente de imagen */}
+      {showSelector && (
+        <ImageSourceSelector 
+          type={showSelector} 
+          onClose={() => setShowSelector(null)} 
+        />
+      )}
+
       <div className="mb-8 text-center">
         <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
           Sube los Documentos
@@ -157,10 +263,11 @@ export default function UploadBox({ onFilesUploaded, onManualFill }: UploadBoxPr
           <div className="ml-3">
             <h3 className="font-medium text-accent-foreground mb-2">Consejos para mejores resultados</h3>
             <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+              <li>Usa la cámara para obtener mejores resultados en tiempo real.</li>
               <li>Asegúrate de que las imágenes estén bien iluminadas y enfocadas.</li>
               <li>Evita sombras o reflejos en los documentos.</li>
               <li>Coloca los documentos sobre una superficie plana y oscura.</li>
-              <li>La resolución debe ser suficiente para leer el texto claramente.</li>
+              <li>Mantén el dispositivo estable al tomar la foto.</li>
             </ul>
           </div>
         </div>
