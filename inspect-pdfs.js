@@ -41,9 +41,11 @@ async function inspectPDF(filename) {
 async function main() {
   console.log('🔍 Inspeccionando templates PDF...\n');
   
-  await inspectPDF('contrato-tipo-compra-venta-vehiculos.pdf');
-  await inspectPDF('Mod.02-ES.pdf');
-  
+//  await inspectPDF('contrato-tipo-compra-venta-vehiculos.pdf');
+//  await inspectPDF('Mod.02-ES.pdf');
+//  await inspectPDF('CONTRATO DE COMPRA-VENTA NUEVO.pdf');
+  await inspectPDF('CONTRATO_DE_COMPRA-VENTA.pdf');
+
   console.log('\n💡 Si no hay campos, los PDFs son solo imágenes/texto.');
   console.log('   Necesitarías PDFs con campos de formulario para rellenar automáticamente.');
 }

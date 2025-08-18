@@ -110,9 +110,7 @@ export default function Home() {
       a.href = url
       
       // Set filename based on document type
-      const filename = type === 'contract' 
-        ? 'contrato-compraventa.pdf' 
-        : 'mod-02-es.pdf'
+      const filename = type === 'contract' ? 'contrato-compraventa.pdf' : 'mod-02-es.pdf'
       
       a.download = filename
       document.body.appendChild(a)

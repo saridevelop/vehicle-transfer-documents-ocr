@@ -6,6 +6,7 @@ export function parseDNIData(ocrResult: any): PersonData {
     dni: ocrResult.dni || '',
     fechaNacimiento: ocrResult.fechaNacimiento || '',
     direccion: ocrResult.direccion || '',
+    poblacion: ocrResult.poblacion || '',
     fechaCaducidad: ocrResult.fechaCaducidad || ''
   }
 }

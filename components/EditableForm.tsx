@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { Upload } from 'lucide-react'
 import { useDebounce } from 'use-debounce'
 import { DocumentData } from '@/lib/types'
 import { useMobileInput } from '@/lib/hooks/useMobileInput'
-import { Download, UserCircle, Car, FileSignature } from 'lucide-react'
+import { Download, UserCircle, Car, FileSignature, Eye, FileX } from 'lucide-react'
 
 interface EditableFormProps {
   data: DocumentData
@@ -20,6 +21,54 @@ export default function EditableForm({
   isProcessing 
 }: EditableFormProps) {
   const [formData, setFormData] = useState(data)
+  const [uploadingSection, setUploadingSection] = useState<null | 'vendedor' | 'comprador' | 'vehiculo'>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [previewPdf, setPreviewPdf] = useState<string | null>(null)
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false)
+  // Maneja la subida de una nueva foto para una sección específica
+  const handleSectionPhotoUpload = async (section: 'vendedor' | 'comprador' | 'vehiculo', file: File) => {
+    setIsUploading(true)
+    try {
+      const formData = new FormData()
+      // El API espera 'ficha' para el vehículo, no 'vehiculo'
+      const fieldName = section === 'vehiculo' ? 'ficha' : section
+      formData.append(fieldName, file)
+      
+      console.log(`Uploading ${section} with field name: ${fieldName}`)
+      
+      const response = await fetch('/api/process', {
+        method: 'POST',
+        body: formData
+      })
+      if (!response.ok) throw new Error('Error al procesar la imagen')
+      const data = await response.json()
+      
+      console.log('OCR Response:', data)
+      
+      // Solo actualiza la sección correspondiente
+      setFormData(prev => ({
+        ...prev,
+        [section]: data[section] || {}
+      }))
+      if (onDataUpdate) {
+        // Usar el nuevo estado actualizado
+        setFormData(prev => {
+          const updated = {
+            ...prev,
+            [section]: data[section] || {}
+          }
+          onDataUpdate(updated)
+          return updated
+        })
+      }
+    } catch (e) {
+      console.error('Error uploading section photo:', e)
+      alert('Error al procesar la imagen. Intenta de nuevo.')
+    } finally {
+      setIsUploading(false)
+      setUploadingSection(null)
+    }
+  }
   const isUserEditingRef = useRef(false)
   const prevDataRef = useRef(data)
 
@@ -52,6 +101,7 @@ export default function EditableForm({
     }
   }, [debouncedFormData, onDataUpdate])
 
+
   // Handler optimizado que previene re-renders innecesarios
   const handleFieldChange = useCallback((
     section: keyof DocumentData,
@@ -59,7 +109,6 @@ export default function EditableForm({
     value: string
   ) => {
     isUserEditingRef.current = true
-    
     setFormData(prevData => ({
       ...prevData,
       [section]: {
@@ -69,16 +118,43 @@ export default function EditableForm({
     }))
   }, [])
 
-  // Componente FormSection memoizado para evitar re-renders
-  const FormSection = useCallback(({ title, icon: Icon, children }: { 
-    title: string, 
-    icon: React.ElementType, 
-    children: React.ReactNode 
+  // Handlers para los campos de vendedor, comprador y vehiculo
+  const vendedorHandlers = useMemo(() => ({
+    nombre: (value: string) => handleFieldChange('vendedor', 'nombre', value),
+    dni: (value: string) => handleFieldChange('vendedor', 'dni', value),
+    fechaNacimiento: (value: string) => handleFieldChange('vendedor', 'fechaNacimiento', value),
+    direccion: (value: string) => handleFieldChange('vendedor', 'direccion', value),
+    poblacion: (value: string) => handleFieldChange('vendedor', 'poblacion', value),
+  }), [handleFieldChange])
+
+  const compradorHandlers = useMemo(() => ({
+    nombre: (value: string) => handleFieldChange('comprador', 'nombre', value),
+    dni: (value: string) => handleFieldChange('comprador', 'dni', value),
+    fechaNacimiento: (value: string) => handleFieldChange('comprador', 'fechaNacimiento', value),
+    direccion: (value: string) => handleFieldChange('comprador', 'direccion', value),
+    poblacion: (value: string) => handleFieldChange('comprador', 'poblacion', value),
+  }), [handleFieldChange])
+
+
+  // Componente FormSection profesional con botón flotante opcional
+  const FormSection = useCallback(({
+    title,
+    icon: Icon,
+    children,
+    uploadButton
+  }: {
+    title: string,
+    icon: React.ElementType,
+    children: React.ReactNode,
+    uploadButton?: React.ReactNode
   }) => (
     <div className="bg-card rounded-xl shadow-sm border border-border p-6 mb-8">
-      <div className="flex items-center mb-6">
+      <div className="flex items-center mb-6 relative">
         <Icon className="h-7 w-7 text-primary mr-3" />
-        <h3 className="text-xl font-semibold text-foreground">{title}</h3>
+        <h3 className="text-xl font-semibold text-foreground flex-1">{title}</h3>
+        {uploadButton && (
+          <div className="absolute right-0 top-1">{uploadButton}</div>
+        )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
         {children}
@@ -103,13 +179,11 @@ export default function EditableForm({
     id: string
   }) => {
     const inputRef = useRef<HTMLInputElement>(null)
-    
     // Memoizar handlers para evitar re-renders
     const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
       e.preventDefault()
       onChange(e.target.value)
     }, [onChange])
-
     return (
       <div className="space-y-2">
         <label 
@@ -148,7 +222,6 @@ export default function EditableForm({
     id: string
   }) => {
     const dateRef = useRef<HTMLInputElement>(null)
-
     // Memoizar conversores para evitar recálculos
     const toInputFormat = useCallback((dateStr: string): string => {
       if (!dateStr || dateStr.length < 10) return ''
@@ -159,20 +232,17 @@ export default function EditableForm({
       }
       return ''
     }, [])
-
     const toDisplayFormat = useCallback((dateStr: string): string => {
       if (!dateStr) return ''
       const [year, month, day] = dateStr.split('-')
       return `${day}/${month}/${year}`
     }, [])
-
     const handleDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
       e.preventDefault()
       const inputValue = e.target.value
       const displayValue = inputValue ? toDisplayFormat(inputValue) : ''
       onChange(displayValue)
     }, [onChange, toDisplayFormat])
-
     return (
       <div className="space-y-2">
         <label 
@@ -195,31 +265,76 @@ export default function EditableForm({
     )
   }, [handleInputFocus, handleInputBlur])
 
-  // Memoizar handlers específicos para evitar re-renders
-  const vendedorHandlers = useMemo(() => ({
-    nombre: (value: string) => handleFieldChange('vendedor', 'nombre', value),
-    dni: (value: string) => handleFieldChange('vendedor', 'dni', value),
-    fechaNacimiento: (value: string) => handleFieldChange('vendedor', 'fechaNacimiento', value),
-    direccion: (value: string) => handleFieldChange('vendedor', 'direccion', value),
-  }), [handleFieldChange])
-
-  const compradorHandlers = useMemo(() => ({
-    nombre: (value: string) => handleFieldChange('comprador', 'nombre', value),
-    dni: (value: string) => handleFieldChange('comprador', 'dni', value),
-    fechaNacimiento: (value: string) => handleFieldChange('comprador', 'fechaNacimiento', value),
-    direccion: (value: string) => handleFieldChange('comprador', 'direccion', value),
-  }), [handleFieldChange])
-
   const vehiculoHandlers = useMemo(() => ({
     marca: (value: string) => handleFieldChange('vehiculo', 'marca', value),
     modelo: (value: string) => handleFieldChange('vehiculo', 'modelo', value),
+    denominacionComercial: (value: string) => handleFieldChange('vehiculo', 'denominacionComercial', value),
     matricula: (value: string) => handleFieldChange('vehiculo', 'matricula', value),
     bastidor: (value: string) => handleFieldChange('vehiculo', 'bastidor', value),
     fechaMatriculacion: (value: string) => handleFieldChange('vehiculo', 'fechaMatriculacion', value),
-    tipoVehiculo: (value: string) => handleFieldChange('vehiculo', 'tipoVehiculo', value),
+    categoria: (value: string) => handleFieldChange('vehiculo', 'categoria', value),
+    carroceria: (value: string) => handleFieldChange('vehiculo', 'carroceria', value),
     potencia: (value: string) => handleFieldChange('vehiculo', 'potencia', value),
     cilindrada: (value: string) => handleFieldChange('vehiculo', 'cilindrada', value),
+    combustible: (value: string) => handleFieldChange('vehiculo', 'combustible', value),
+    plazasAsiento: (value: string) => handleFieldChange('vehiculo', 'plazasAsiento', value),
+    color: (value: string) => handleFieldChange('vehiculo', 'color', value),
+    // Mantener compatibilidad
+    tipoVehiculo: (value: string) => handleFieldChange('vehiculo', 'tipoVehiculo', value),
   }), [handleFieldChange])
+
+  const handlePreviewPdf = async (type: 'contract' | 'mod02') => {
+    setIsGeneratingPreview(true)
+    try {
+      const response = await fetch('/api/generate-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: formData,
+          type: type,
+          preview: true
+        }),
+      })
+      if (!response.ok) throw new Error('Error generando preview')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      setPreviewPdf(url)
+    } catch (error) {
+      alert('Error al generar la previsualización')
+    } finally {
+      setIsGeneratingPreview(false)
+    }
+  }
+
+  const handleDownloadXML = async () => {
+    try {
+      const response = await fetch('/api/generate-xml', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: formData
+        }),
+      })
+      if (!response.ok) throw new Error('Error generando XML')
+      
+      // Crear descarga del archivo
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `CTIT_${new Date().toISOString().replace(/[-:]/g, '').replace('T', '').split('.')[0]}.xml`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      alert('Error al generar el archivo XML')
+    }
+  }
 
   return (
     <div className="w-full max-w-4xl mx-auto mobile-form-container">
@@ -232,7 +347,33 @@ export default function EditableForm({
         </p>
       </div>
 
-      <FormSection title="Datos del Vendedor" icon={UserCircle}>
+      <FormSection
+        title="Datos del Vendedor"
+        icon={UserCircle}
+        uploadButton={
+          <label className="inline-flex items-center gap-2 cursor-pointer text-primary hover:underline bg-background px-2 py-1 rounded shadow-sm border border-border">
+            <Upload className="h-4 w-4" />
+            <span className="hidden sm:inline">Subir foto de DNI</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={isUploading}
+              onChange={e => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  setUploadingSection('vendedor')
+                  handleSectionPhotoUpload('vendedor', file)
+                }
+                e.target.value = ''
+              }}
+            />
+          </label>
+        }
+      >
+        {uploadingSection === 'vendedor' && isUploading && (
+          <span className="ml-2 text-xs text-muted-foreground absolute right-0 top-8">Procesando...</span>
+        )}
         <InputField
           id="vendedor-nombre"
           label="Nombre completo"
@@ -258,11 +399,44 @@ export default function EditableForm({
           label="Dirección"
           value={formData.vendedor.direccion || ''}
           onChange={vendedorHandlers.direccion}
-          placeholder="Dirección completa"
+          placeholder="Calle, número, piso, puerta"
+        />
+        <InputField
+          id="vendedor-poblacion"
+          label="Población"
+          value={formData.vendedor.poblacion || ''}
+          onChange={vendedorHandlers.poblacion}
+          placeholder="Ciudad y código postal"
         />
       </FormSection>
 
-      <FormSection title="Datos del Comprador" icon={UserCircle}>
+      <FormSection
+        title="Datos del Comprador"
+        icon={UserCircle}
+        uploadButton={
+          <label className="inline-flex items-center gap-2 cursor-pointer text-primary hover:underline bg-background px-2 py-1 rounded shadow-sm border border-border">
+            <Upload className="h-4 w-4" />
+            <span className="hidden sm:inline">Subir foto de DNI</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={isUploading}
+              onChange={e => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  setUploadingSection('comprador')
+                  handleSectionPhotoUpload('comprador', file)
+                }
+                e.target.value = ''
+              }}
+            />
+          </label>
+        }
+      >
+        {uploadingSection === 'comprador' && isUploading && (
+          <span className="ml-2 text-xs text-muted-foreground absolute right-0 top-8">Procesando...</span>
+        )}
         <InputField
           id="comprador-nombre"
           label="Nombre completo"
@@ -288,24 +462,64 @@ export default function EditableForm({
           label="Dirección"
           value={formData.comprador.direccion || ''}
           onChange={compradorHandlers.direccion}
-          placeholder="Dirección completa"
+          placeholder="Calle, número, piso, puerta"
+        />
+        <InputField
+          id="comprador-poblacion"
+          label="Población"
+          value={formData.comprador.poblacion || ''}
+          onChange={compradorHandlers.poblacion}
+          placeholder="Ciudad y código postal"
         />
       </FormSection>
 
-      <FormSection title="Datos del Vehículo" icon={Car}>
+      <FormSection
+        title="Datos del Vehículo"
+        icon={Car}
+        uploadButton={
+          <label className="inline-flex items-center gap-2 cursor-pointer text-primary hover:underline bg-background px-2 py-1 rounded shadow-sm border border-border">
+            <Upload className="h-4 w-4" />
+            <span className="hidden sm:inline">Subir foto de ficha</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={isUploading}
+              onChange={e => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  setUploadingSection('vehiculo')
+                  handleSectionPhotoUpload('vehiculo', file)
+                }
+                e.target.value = ''
+              }}
+            />
+          </label>
+        }
+      >
+        {uploadingSection === 'vehiculo' && isUploading && (
+          <span className="ml-2 text-xs text-muted-foreground absolute right-0 top-8">Procesando...</span>
+        )}
         <InputField
           id="vehiculo-marca"
-          label="Marca"
+          label="Marca (D.1)"
           value={formData.vehiculo.marca || ''}
           onChange={vehiculoHandlers.marca}
           placeholder="Ej: Toyota, Volkswagen"
         />
         <InputField
           id="vehiculo-modelo"
-          label="Modelo"
+          label="Modelo (D.2)"
           value={formData.vehiculo.modelo || ''}
           onChange={vehiculoHandlers.modelo}
           placeholder="Ej: Corolla, Golf"
+        />
+        <InputField
+          id="vehiculo-denominacionComercial"
+          label="Denominación comercial (D.3)"
+          value={formData.vehiculo.denominacionComercial || ''}
+          onChange={vehiculoHandlers.denominacionComercial}
+          placeholder="Nombre comercial del modelo"
         />
         <InputField
           id="vehiculo-matricula"
@@ -316,7 +530,7 @@ export default function EditableForm({
         />
         <InputField
           id="vehiculo-bastidor"
-          label="Número de bastidor (VIN)"
+          label="Número de bastidor (E)"
           value={formData.vehiculo.bastidor || ''}
           onChange={vehiculoHandlers.bastidor}
           placeholder="VIN del vehículo"
@@ -328,45 +542,83 @@ export default function EditableForm({
           onChange={vehiculoHandlers.fechaMatriculacion}
         />
         <InputField
-          id="vehiculo-tipoVehiculo"
-          label="Tipo de vehículo"
-          value={formData.vehiculo.tipoVehiculo || ''}
-          onChange={vehiculoHandlers.tipoVehiculo}
-          placeholder="Ej: Turismo, Furgón"
+          id="vehiculo-categoria"
+          label="Categoría (J)"
+          value={formData.vehiculo.categoria || ''}
+          onChange={vehiculoHandlers.categoria}
+          placeholder="Ej: M1, N1, L3e"
+        />
+        <InputField
+          id="vehiculo-carroceria"
+          label="Carrocería (J.1)"
+          value={formData.vehiculo.carroceria || ''}
+          onChange={vehiculoHandlers.carroceria}
+          placeholder="Ej: Berlina, Familiar"
         />
         <InputField
           id="vehiculo-potencia"
-          label="Potencia (CV)"
+          label="Potencia (P.2)"
           value={formData.vehiculo.potencia || ''}
           onChange={vehiculoHandlers.potencia}
-          placeholder="Ej: 110"
+          placeholder="Ej: 110 CV o 81 kW"
         />
         <InputField
           id="vehiculo-cilindrada"
-          label="Cilindrada (cm³)"
+          label="Cilindrada (P.1)"
           value={formData.vehiculo.cilindrada || ''}
           onChange={vehiculoHandlers.cilindrada}
-          placeholder="Ej: 1598"
+          placeholder="Ej: 1598 cm³"
+        />
+        <InputField
+          id="vehiculo-combustible"
+          label="Combustible (P.3)"
+          value={formData.vehiculo.combustible || ''}
+          onChange={vehiculoHandlers.combustible}
+          placeholder="Ej: Gasolina, Diesel, Eléctrico"
+        />
+        <InputField
+          id="vehiculo-plazasAsiento"
+          label="Plazas asiento (S.1)"
+          value={formData.vehiculo.plazasAsiento || ''}
+          onChange={vehiculoHandlers.plazasAsiento}
+          placeholder="Ej: 5"
+        />
+        <InputField
+          id="vehiculo-color"
+          label="Color (R)"
+          value={formData.vehiculo.color || ''}
+          onChange={vehiculoHandlers.color}
+          placeholder="Ej: Blanco, Azul"
         />
       </FormSection>
 
       <div className="bg-card rounded-xl shadow-sm border border-border p-6">
         <h3 className="text-xl font-semibold text-foreground mb-6 text-center">📄 Documentos para Descargar</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-background/50 p-6 rounded-lg border border-input flex flex-col">
             <FileSignature className="h-8 w-8 text-primary mb-3"/>
             <h4 className="font-semibold text-foreground mb-2">Contrato de Compraventa</h4>
             <p className="text-sm text-muted-foreground mb-4 flex-grow">
               Documento legal para la venta entre particulares.
             </p>
-            <button
-              onClick={() => onGeneratePDFs('contract')}
-              disabled={isProcessing}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full min-h-[44px] touch-manipulation"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {isProcessing ? 'Generando...' : 'Descargar Contrato'}
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={() => handlePreviewPdf('contract')}
+                disabled={isGeneratingPreview}
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 w-full min-h-[44px] touch-manipulation"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                {isGeneratingPreview ? 'Cargando...' : 'Previsualizar'}
+              </button>
+              <button
+                onClick={() => onGeneratePDFs('contract')}
+                disabled={isProcessing}
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full min-h-[44px] touch-manipulation"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {isProcessing ? 'Generando...' : 'Descargar Contrato'}
+              </button>
+            </div>
           </div>
           
           <div className="bg-background/50 p-6 rounded-lg border border-input flex flex-col">
@@ -375,17 +627,63 @@ export default function EditableForm({
             <p className="text-sm text-muted-foreground mb-4 flex-grow">
               Formulario oficial de la DGT para el cambio de titularidad.
             </p>
+            <div className="space-y-2">
+              <button
+                onClick={() => handlePreviewPdf('mod02')}
+                disabled={isGeneratingPreview}
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 w-full min-h-[44px] touch-manipulation"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                {isGeneratingPreview ? 'Cargando...' : 'Previsualizar'}
+              </button>
+              <button
+                onClick={() => onGeneratePDFs('mod02')}
+                disabled={isProcessing}
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full min-h-[44px] touch-manipulation"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {isProcessing ? 'Generando...' : 'Descargar Mod.02-ES'}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-background/50 p-6 rounded-lg border border-input flex flex-col">
+            <FileX className="h-8 w-8 text-primary mb-3"/>
+            <h4 className="font-semibold text-foreground mb-2">XML DGT (CTIT)</h4>
+            <p className="text-sm text-muted-foreground mb-4 flex-grow">
+              Archivo XML para tramitación electrónica ante la DGT.
+            </p>
             <button
-              onClick={() => onGeneratePDFs('mod02')}
-              disabled={isProcessing}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 w-full min-h-[44px] touch-manipulation"
+              onClick={handleDownloadXML}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white hover:bg-green-700 h-10 px-4 py-2 w-full min-h-[44px] touch-manipulation"
             >
               <Download className="h-4 w-4 mr-2" />
-              {isProcessing ? 'Generando...' : 'Descargar Mod.02-ES'}
+              Descargar XML
             </button>
           </div>
         </div>
       </div>
+
+      {previewPdf && (
+        <div className="mt-8 bg-card rounded-xl shadow-sm border border-border p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-foreground">📄 Previsualización del Documento</h3>
+            <button
+              onClick={() => setPreviewPdf(null)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="w-full h-96 border border-border rounded-lg overflow-hidden">
+            <iframe
+              src={previewPdf}
+              className="w-full h-full"
+              title="Previsualización del PDF"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

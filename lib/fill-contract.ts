@@ -3,9 +3,19 @@ import fs from 'fs'
 import path from 'path'
 import { DocumentData } from './types'
 
-export async function fillContractPDF(data: DocumentData): Promise<Uint8Array> {
+export type ContractType = 'original' | 'new'
+
+export async function fillContractPDF(data: DocumentData, contractType: ContractType = 'new'): Promise<Uint8Array> {
+  if (contractType === 'new') {
+    return fillNewContractPDF(data)
+  } else {
+    return fillOriginalContractPDF(data)
+  }
+}
+
+async function fillOriginalContractPDF(data: DocumentData): Promise<Uint8Array> {
   try {
-    // Read the contract template
+    // Read the original contract template
     const contractPath = path.join(process.cwd(), 'public', 'contracts', 'contrato-tipo-compra-venta-vehiculos.pdf')
     const existingPdfBytes = fs.readFileSync(contractPath)
     
@@ -88,12 +98,7 @@ export async function fillContractPDF(data: DocumentData): Promise<Uint8Array> {
         form.getTextField('numero_bastidor').setText(data.vehiculo.bastidor)
       }
       
-      // Campo kilómetros - puedes dejarlo vacío para que lo rellenen manualmente
-      // if (form.getTextField('kilometros')) {
-      //   form.getTextField('kilometros').setText('______')
-      // }
-      
-      console.log('✅ Contrato de compraventa rellenado correctamente con campos reales')
+      console.log('✅ Contrato de compraventa original rellenado correctamente')
       
     } catch (fieldError) {
       console.log('⚠️ Algunos campos no se pudieron rellenar:', fieldError instanceof Error ? fieldError.message : fieldError)
@@ -107,7 +112,109 @@ export async function fillContractPDF(data: DocumentData): Promise<Uint8Array> {
     return pdfBytes
     
   } catch (error) {
-    console.error('❌ Error filling contract PDF:', error)
-    throw new Error('Error al rellenar el contrato de compraventa')
+    console.error('❌ Error filling original contract PDF:', error)
+    throw new Error('Error al rellenar el contrato de compraventa original')
+  }
+}
+
+async function fillNewContractPDF(data: DocumentData): Promise<Uint8Array> {
+  try {
+    // Read the new contract template
+    const contractPath = path.join(process.cwd(), 'public', 'contracts', 'CONTRATO_DE_COMPRA-VENTA.pdf')
+    const existingPdfBytes = fs.readFileSync(contractPath)
+    
+    // Load the PDF
+    const pdfDoc = await PDFDocument.load(existingPdfBytes)
+    const form = pdfDoc.getForm()
+    
+    // Fill the form fields based on the new contract structure
+    try {
+      // Fecha actual
+      const fechaActual = new Date().toLocaleDateString('es-ES')
+      if (form.getTextField('today_date')) {
+        form.getTextField('today_date').setText(fechaActual)
+      }
+      
+      // Datos del vendedor
+      if (data.vendedor.nombre && form.getTextField('vendedor_nombre')) {
+        form.getTextField('vendedor_nombre').setText(data.vendedor.nombre)
+      }
+      
+      if (data.vendedor.dni && form.getTextField('vendedor_dni')) {
+        form.getTextField('vendedor_dni').setText(data.vendedor.dni)
+      }
+      
+      if (data.vendedor.direccion && form.getTextField('vendedor_direccion')) {
+        form.getTextField('vendedor_direccion').setText(data.vendedor.direccion)
+      }
+      
+      if (data.vendedor.poblacion && form.getTextField('vendedor_poblacion')) {
+        form.getTextField('vendedor_poblacion').setText(data.vendedor.poblacion)
+      }
+      
+      // Datos del comprador
+      if (data.comprador.nombre && form.getTextField('comprador_nombre')) {
+        form.getTextField('comprador_nombre').setText(data.comprador.nombre)
+      }
+      
+      if (data.comprador.dni && form.getTextField('comprador_dni')) {
+        form.getTextField('comprador_dni').setText(data.comprador.dni)
+      }
+      
+      // Hay dos campos comprador_direccion en el PDF según el análisis
+      if (data.comprador.direccion) {
+        const direccionFields = ['comprador_direccion']
+        direccionFields.forEach(fieldName => {
+          try {
+            const field = form.getTextField(fieldName)
+            if (field) {
+              field.setText(data.comprador.direccion)
+            }
+          } catch (e) {
+            // Campo no existe, continuar
+          }
+        })
+      }
+
+      if (data.comprador.poblacion && form.getTextField('comprador_poblacion')) {
+        form.getTextField('comprador_poblacion').setText(data.comprador.poblacion)
+      }
+
+      // Datos del vehículo
+      if (data.vehiculo.matricula && form.getTextField('matricula')) {
+        form.getTextField('matricula').setText(data.vehiculo.matricula)
+      }
+      
+      if (data.vehiculo.marca && data.vehiculo.modelo && form.getTextField('marca_y_modelo')) {
+        form.getTextField('marca_y_modelo').setText(`${data.vehiculo.marca} ${data.vehiculo.modelo}`)
+      } else if (data.vehiculo.marca && form.getTextField('marca_y_modelo')) {
+        form.getTextField('marca_y_modelo').setText(data.vehiculo.marca)
+      }
+      
+      if (data.vehiculo.bastidor && form.getTextField('numero_bastidor')) {
+        form.getTextField('numero_bastidor').setText(data.vehiculo.bastidor)
+      }
+      
+      // Campo precio - dejarlo vacío para que lo rellenen manualmente
+      // if (form.getTextField('precio')) {
+      //   form.getTextField('precio').setText('')
+      // }
+      
+      console.log('✅ Nuevo contrato de compraventa rellenado correctamente')
+      
+    } catch (fieldError) {
+      console.log('⚠️ Algunos campos no se pudieron rellenar:', fieldError instanceof Error ? fieldError.message : fieldError)
+    }
+    
+    // No hacer flatten para permitir edición manual posterior
+    // form.flatten()
+    
+    // Serialize the PDF
+    const pdfBytes = await pdfDoc.save()
+    return pdfBytes
+    
+  } catch (error) {
+    console.error('❌ Error filling new contract PDF:', error)
+    throw new Error('Error al rellenar el nuevo contrato de compraventa')
   }
 }
