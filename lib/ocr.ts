@@ -119,36 +119,72 @@ export async function processImageWithOCR(
     console.log('Received response from OpenAI')
 
     const content = response.choices[0]?.message?.content
-    console.log('OpenAI raw response:', content)
+    
+    console.log('============ RESPUESTA DE OPENAI ============')
+    console.log('Response completo:', response)
+    console.log('Choices length:', response.choices?.length || 0)
+    console.log('Respuesta raw de OpenAI:')
+    console.log('Tipo:', typeof content)
+    console.log('Longitud:', content?.length || 0)
+    console.log('Contenido completo:')
+    console.log(content)
+    console.log('===========================================')
     
     if (!content) {
       throw new Error('No se recibió respuesta del OCR')
     }
 
+    let jsonString = ''
     try {
       // Limpiar la respuesta de marcadores de código markdown si existen
-      let jsonString = content.trim()
+      jsonString = content.trim()
+      
+      console.log('Iniciando limpieza de la respuesta...')
+      console.log('String original (primeros 200 chars):', jsonString.substring(0, 200))
       
       // Remover ```json al inicio y ``` al final si existen
       if (jsonString.startsWith('```json')) {
         jsonString = jsonString.replace(/^```json\s*/, '')
+        console.log('Removido ```json del inicio')
       }
       if (jsonString.startsWith('```')) {
         jsonString = jsonString.replace(/^```\s*/, '')
+        console.log('Removido ``` del inicio')
       }
       if (jsonString.endsWith('```')) {
         jsonString = jsonString.replace(/\s*```$/, '')
+        console.log('Removido ``` del final')
       }
       
-      console.log('Cleaned JSON string:', jsonString)
+      console.log('String después de limpieza (primeros 200 chars):', jsonString.substring(0, 200))
+      console.log('String después de limpieza (últimos 200 chars):', jsonString.substring(Math.max(0, jsonString.length - 200)))
+      
+      console.log('Intentando parsear JSON...')
       const parsedResult = JSON.parse(jsonString)
       console.log('Parsed JSON result:', parsedResult)
       return parsedResult
-    } catch (parseError) {
-      console.error('Error parsing OCR response:', content)
-      throw new Error('Error al parsear la respuesta del OCR')
+    } catch (parseError: any) {
+      console.error('============ ERROR DE PARSEO JSON ============')
+      console.error('Respuesta original de OpenAI:')
+      console.error('Tipo:', typeof content)
+      console.error('Longitud:', content?.length || 0)
+      console.error('Contenido completo:')
+      console.error(content)
+      console.error('============================================')
+      console.error('JSON string después de limpieza:')
+      console.error('Tipo:', typeof jsonString)
+      console.error('Longitud:', jsonString?.length || 0)
+      console.error('Contenido limpio:')
+      console.error(jsonString)
+      console.error('============================================')
+      console.error('Error específico de JSON.parse:')
+      console.error('Mensaje:', parseError?.message || 'Sin mensaje')
+      console.error('Stack:', parseError?.stack || 'Sin stack')
+      console.error('============================================')
+      
+      throw new Error(`Error al parsear la respuesta del OCR. Respuesta de OpenAI: "${content?.substring(0, 500)}${content?.length > 500 ? '...' : ''}"`)
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in OCR processing:', error)
     throw error
   }

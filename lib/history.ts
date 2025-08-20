@@ -28,10 +28,10 @@ export function saveToHistory(data: DocumentData): HistoryItem {
     date: new Date(timestamp).toLocaleString('es-ES'),
     data,
     summary: {
-      vendedorNombre: data.vendedor?.nombre || data.vendedor?.nombreCompleto,
-      vendedorNif: data.vendedor?.nif || data.vendedor?.dni,
-      compradorNombre: data.comprador?.nombre || data.comprador?.nombreCompleto,
-      compradorNif: data.comprador?.nif || data.comprador?.dni,
+      vendedorNombre: data.vendedor?.nombre,
+      vendedorNif: data.vendedor?.dni,
+      compradorNombre: data.comprador?.nombre,
+      compradorNif: data.comprador?.dni,
       vehiculoMarca: data.vehiculo?.marca,
       vehiculoModelo: data.vehiculo?.modelo,
       vehiculoMatricula: data.vehiculo?.matricula

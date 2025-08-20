@@ -169,7 +169,7 @@ export default function EditableForm({
   ), [])
 
   // Componente Input profesional con estabilidad garantizada
-  const InputField = useCallback(({ 
+  const InputField = ({ 
     label, 
     value, 
     onChange, 
@@ -184,12 +184,6 @@ export default function EditableForm({
     type?: string
     id: string
   }) => {
-    const inputRef = useRef<HTMLInputElement>(null)
-    // Memoizar handlers para evitar re-renders
-    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-      e.preventDefault()
-      onChange(e.target.value)
-    }, [onChange])
     return (
       <div className="space-y-2">
         <label 
@@ -199,11 +193,10 @@ export default function EditableForm({
           {label}
         </label>
         <input
-          ref={inputRef}
           id={id}
           type={type}
           value={value || ''}
-          onChange={handleChange}
+          onChange={(e) => onChange(e.target.value)}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
           placeholder={placeholder}
@@ -213,10 +206,10 @@ export default function EditableForm({
         />
       </div>
     )
-  }, [handleInputFocus, handleInputBlur])
+  }
 
   // Componente DateField profesional con estabilidad garantizada
-  const DateField = useCallback(({ 
+  const DateField = ({ 
     label, 
     value, 
     onChange,
@@ -227,9 +220,7 @@ export default function EditableForm({
     onChange: (value: string) => void
     id: string
   }) => {
-    const dateRef = useRef<HTMLInputElement>(null)
-    // Memoizar conversores para evitar recálculos
-    const toInputFormat = useCallback((dateStr: string): string => {
+    const toInputFormat = (dateStr: string): string => {
       if (!dateStr || dateStr.length < 10) return ''
       const parts = dateStr.split('/')
       if (parts.length === 3) {
@@ -237,18 +228,17 @@ export default function EditableForm({
         return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
       }
       return ''
-    }, [])
-    const toDisplayFormat = useCallback((dateStr: string): string => {
+    }
+    const toDisplayFormat = (dateStr: string): string => {
       if (!dateStr) return ''
       const [year, month, day] = dateStr.split('-')
       return `${day}/${month}/${year}`
-    }, [])
-    const handleDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-      e.preventDefault()
+    }
+    const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const inputValue = e.target.value
       const displayValue = inputValue ? toDisplayFormat(inputValue) : ''
       onChange(displayValue)
-    }, [onChange, toDisplayFormat])
+    }
     return (
       <div className="space-y-2">
         <label 
@@ -258,7 +248,6 @@ export default function EditableForm({
           {label}
         </label>
         <input
-          ref={dateRef}
           id={id}
           type="date"
           value={toInputFormat(value)}
@@ -269,7 +258,7 @@ export default function EditableForm({
         />
       </div>
     )
-  }, [handleInputFocus, handleInputBlur])
+  }
 
   const vehiculoHandlers = useMemo(() => ({
     marca: (value: string) => handleFieldChange('vehiculo', 'marca', value),
