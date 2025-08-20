@@ -4,8 +4,11 @@ import { useState, useEffect } from 'react'
 import UploadBox from '@/components/UploadBox'
 import EditableForm from '@/components/EditableForm'
 import ProcessingStep from '@/components/ProcessingStep'
+import HistoryModal from '@/components/HistoryModal'
 import { DocumentData } from '@/lib/types'
-import { FileText, RefreshCw, Share2 } from 'lucide-react'
+import { FileText, RefreshCw, Share2, User, Car, AlertTriangle, CheckCircle2, Save, History } from 'lucide-react'
+import { saveToHistory, getHistory, HistoryItem } from '@/lib/history'
+import toast from 'react-hot-toast'
 
 export default function Home() {
   const [step, setStep] = useState(1)
@@ -14,7 +17,22 @@ export default function Home() {
     comprador: {},
     vehiculo: {}
   })
+  const [uploadedFiles, setUploadedFiles] = useState<{
+    vendedor?: File,
+    comprador?: File,
+    ficha?: File
+  }>({})
   const [isProcessing, setIsProcessing] = useState(false)
+  const [processingStatus, setProcessingStatus] = useState<{
+    vendedor: 'idle' | 'processing' | 'success' | 'error'
+    comprador: 'idle' | 'processing' | 'success' | 'error'
+    ficha: 'idle' | 'processing' | 'success' | 'error'
+  }>({
+    vendedor: 'idle',
+    comprador: 'idle', 
+    ficha: 'idle'
+  })
+  const [showHistory, setShowHistory] = useState(false)
 
   // Check for data in URL on component mount
   useEffect(() => {
@@ -25,55 +43,105 @@ export default function Home() {
       try {
         const decodedData = JSON.parse(atob(encodedData))
         setDocumentData(decodedData)
-        setStep(3) // Skip to edit form
+        setStep(2) // Skip to edit form
         
         // Show notification
         setTimeout(() => {
-          alert('✅ Datos cargados desde el enlace compartido')
+          toast.success('Datos cargados desde el enlace compartido')
         }, 500)
       } catch (error) {
         console.error('Error decoding URL data:', error)
-        alert('❌ Error al cargar los datos del enlace. Empezando desde cero.')
+        toast.error('Error al cargar los datos del enlace. Empezando desde cero.')
       }
     }
   }, [])
 
-  const handleFilesUploaded = async (files: {
-    vendedor?: File,
-    comprador?: File,
-    ficha?: File
-  }) => {
-    setIsProcessing(true)
-    setStep(2)
+  const processImage = async (file: File, type: 'vendedor' | 'comprador' | 'ficha') => {
+    setProcessingStatus(prev => ({
+      ...prev,
+      [type]: 'processing'
+    }))
 
     try {
       const formData = new FormData()
-      if (files.vendedor) formData.append('vendedor', files.vendedor)
-      if (files.comprador) formData.append('comprador', files.comprador)
-      if (files.ficha) formData.append('ficha', files.ficha)
+      formData.append('image', file)
+      formData.append('type', type)
 
-      const response = await fetch('/api/process', {
+      const response = await fetch('/api/process-image', {
         method: 'POST',
         body: formData
       })
 
       if (!response.ok) {
-        throw new Error('Error al procesar los documentos')
+        throw new Error('Error al procesar la imagen')
       }
 
-      const data = await response.json()
-      setDocumentData(data)
-      setStep(3)
+      const result = await response.json()
+      
+      setDocumentData(prev => ({
+        ...prev,
+        [type === 'ficha' ? 'vehiculo' : type]: result.data
+      }))
+
+      setProcessingStatus(prev => ({
+        ...prev,
+        [type]: 'success'
+      }))
+
+      return true
+
     } catch (error) {
-      console.error('Error:', error)
-      alert('Error al procesar los documentos. Por favor, inténtelo de nuevo.')
-    } finally {
-      setIsProcessing(false)
+      console.error(`Error processing ${type}:`, error)
+      setProcessingStatus(prev => ({
+        ...prev,
+        [type]: 'error'
+      }))
+      return false
     }
+  }
+
+  const handleFileSelected = async (file: File, type: 'vendedor' | 'comprador' | 'ficha') => {
+    // Update uploaded files
+    setUploadedFiles(prev => ({
+      ...prev,
+      [type]: file
+    }))
+    
+    // Start processing immediately
+    await processImage(file, type)
+  }
+
+  // Auto-advance ONLY when ALL 3 images are successfully processed
+  useEffect(() => {
+    if (step === 1) { // Only auto-advance from step 1
+      const hasVendedor = uploadedFiles.vendedor && processingStatus.vendedor === 'success'
+      const hasComprador = uploadedFiles.comprador && processingStatus.comprador === 'success'  
+      const hasFicha = uploadedFiles.ficha && processingStatus.ficha === 'success'
+      
+      // Only auto-advance if ALL 3 documents are uploaded AND successfully processed
+      if (hasVendedor && hasComprador && hasFicha) {
+        const timer = setTimeout(() => {
+          setStep(2)
+        }, 1000) // 1 second delay to show success state
+        
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [processingStatus, uploadedFiles, step])
+
+  const handleContinue = () => {
+    setStep(2)
   }
 
   const handleDataUpdate = (newData: DocumentData) => {
     setDocumentData(newData)
+  }
+
+  const retryProcessing = async (type: 'vendedor' | 'comprador' | 'ficha') => {
+    const file = uploadedFiles[type]
+    if (file) {
+      await processImage(file, type)
+    }
   }
 
   const handleReset = () => {
@@ -81,6 +149,12 @@ export default function Home() {
       vendedor: {},
       comprador: {},
       vehiculo: {}
+    })
+    setUploadedFiles({})
+    setProcessingStatus({
+      vendedor: 'idle',
+      comprador: 'idle',
+      ficha: 'idle'
     })
     setStep(1)
     // Clear URL parameters
@@ -119,7 +193,7 @@ export default function Home() {
       document.body.removeChild(a)
     } catch (error) {
       console.error('Error:', error)
-      alert('Error al generar el documento. Por favor, inténtelo de nuevo.')
+      toast.error('Error al generar el documento. Por favor, inténtelo de nuevo.')
     } finally {
       setIsProcessing(false)
     }
@@ -132,14 +206,30 @@ export default function Home() {
       comprador: {},
       vehiculo: {}
     })
-    setStep(3)
+    setStep(2)
   }
 
   const handleShare = () => {
     const encodedData = btoa(JSON.stringify(documentData))
     const url = `${window.location.origin}?data=${encodedData}`
     navigator.clipboard.writeText(url)
-    alert('✅ Enlace para compartir copiado al portapapeles')
+    toast.success('Enlace para compartir copiado al portapapeles')
+  }
+
+  const handleSaveToHistory = () => {
+    const historyItem = saveToHistory(documentData)
+    toast.success('Proceso guardado en el histórico')
+  }
+
+  const handleShowHistory = () => {
+    setShowHistory(true)
+  }
+
+  const handleLoadFromHistory = (historyItem: HistoryItem) => {
+    setDocumentData(historyItem.data)
+    setShowHistory(false)
+    setStep(2)
+    toast.success('Proceso cargado desde el histórico')
   }
 
   return (
@@ -156,6 +246,12 @@ export default function Home() {
             Automatiza el llenado de documentos de transferencia usando la magia del OCR con IA.
           </p>
           <div className="mt-6 flex gap-2 justify-center flex-wrap">
+            <button
+              onClick={handleShowHistory}
+              className="inline-flex items-center px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground text-sm font-medium rounded-md min-h-[44px] touch-manipulation"
+            >
+              <History className="mr-2 h-4 w-4" /> Histórico
+            </button>
             {step > 1 && (
               <button
                 onClick={handleReset}
@@ -164,13 +260,21 @@ export default function Home() {
                 <RefreshCw className="mr-2 h-4 w-4" /> Empezar de nuevo
               </button>
             )}
-            {step === 3 && (
-               <button
-                onClick={handleShare}
-                className="inline-flex items-center px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground text-sm font-medium rounded-md min-h-[44px] touch-manipulation"
-              >
-                <Share2 className="mr-2 h-4 w-4" /> Compartir
-              </button>
+            {step === 2 && (
+              <>
+                <button
+                  onClick={handleSaveToHistory}
+                  className="inline-flex items-center px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground text-sm font-medium rounded-md min-h-[44px] touch-manipulation"
+                >
+                  <Save className="mr-2 h-4 w-4" /> Guardar en Histórico
+                </button>
+                <button
+                  onClick={handleShare}
+                  className="inline-flex items-center px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground text-sm font-medium rounded-md min-h-[44px] touch-manipulation"
+                >
+                  <Share2 className="mr-2 h-4 w-4" /> Compartir
+                </button>
+              </>
             )}
           </div>
         </header>
@@ -181,20 +285,17 @@ export default function Home() {
           <div className="mt-10">
             {step === 1 && (
               <UploadBox 
-                onFilesUploaded={handleFilesUploaded} 
+                onFileSelected={handleFileSelected}
                 onManualFill={handleManualFill}
+                processingStatus={processingStatus}
+                onRetry={retryProcessing}
+                files={uploadedFiles}
+                onContinue={handleContinue}
+                showContinueButton={true}
               />
             )}
 
             {step === 2 && (
-              <div className="text-center py-12">
-                <div className="animate-spin-slow rounded-full h-16 w-16 border-t-2 border-b-2 border-primary mx-auto mb-6"></div>
-                <p className="text-xl font-medium text-foreground">Procesando documentos...</p>
-                <p className="text-muted-foreground mt-2">Esto puede tardar unos segundos. Estamos extrayendo la información.</p>
-              </div>
-            )}
-
-            {step === 3 && (
               <EditableForm
                 data={documentData}
                 onDataUpdate={handleDataUpdate}
@@ -202,8 +303,16 @@ export default function Home() {
                 isProcessing={isProcessing}
               />
             )}
+
           </div>
         </main>
+        
+        {/* History Modal */}
+        <HistoryModal
+          isOpen={showHistory}
+          onClose={() => setShowHistory(false)}
+          onLoadItem={handleLoadFromHistory}
+        />
         
         {/* Debug info - show current data */}
         {process.env.NODE_ENV === 'development' && (

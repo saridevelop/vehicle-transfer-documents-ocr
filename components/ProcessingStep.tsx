@@ -6,9 +6,8 @@ interface ProcessingStepProps {
 
 export default function ProcessingStep({ currentStep }: ProcessingStepProps) {
   const steps = [
-    { number: 1, title: 'Subir Documentos' },
-    { number: 2, title: 'Procesar con OCR' },
-    { number: 3, title: 'Revisar y Descargar' }
+    { number: 1, title: 'Subir y Procesar' },
+    { number: 2, title: 'Revisar y Descargar' }
   ]
 
   return (

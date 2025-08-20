@@ -4,31 +4,31 @@ import { useState, useRef } from 'react'
 import { Upload, User, Car, AlertTriangle, CheckCircle2, Camera, Edit, ImageIcon, FileImage, X } from 'lucide-react'
 
 interface UploadBoxProps {
-  onFilesUploaded: (files: {
+  onFileSelected: (file: File, type: 'vendedor' | 'comprador' | 'ficha') => void
+  onManualFill: () => void
+  processingStatus?: {
+    vendedor: 'idle' | 'processing' | 'success' | 'error'
+    comprador: 'idle' | 'processing' | 'success' | 'error'
+    ficha: 'idle' | 'processing' | 'success' | 'error'
+  }
+  onRetry?: (type: 'vendedor' | 'comprador' | 'ficha') => void
+  files: {
     vendedor?: File,
     comprador?: File,
     ficha?: File
-  }) => void
-  onManualFill: () => void
+  }
+  onContinue?: () => void
+  showContinueButton?: boolean
 }
 
-export default function UploadBox({ onFilesUploaded, onManualFill }: UploadBoxProps) {
-  const [files, setFiles] = useState<{
-    vendedor?: File,
-    comprador?: File,
-    ficha?: File
-  }>({})
-  
+export default function UploadBox({ onFileSelected, onManualFill, processingStatus, onRetry, files, onContinue, showContinueButton }: UploadBoxProps) {
   const [showSelector, setShowSelector] = useState<string | null>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (type: 'vendedor' | 'comprador' | 'ficha', file: File | null) => {
     if (file) {
-      setFiles(prev => ({
-        ...prev,
-        [type]: file
-      }))
+      onFileSelected(file, type) // Procesar automáticamente
     }
     setShowSelector(null) // Cerrar el selector después de seleccionar
   }
@@ -61,12 +61,25 @@ export default function UploadBox({ onFilesUploaded, onManualFill }: UploadBoxPr
     e.target.value = ''
   }
 
-  const handleSubmit = () => {
-    if (Object.keys(files).length === 0) {
-      alert('Por favor, sube al menos un documento')
-      return
-    }
-    onFilesUploaded(files)
+  // Verificar si todas las 3 imágenes están procesadas exitosamente
+  const allThreeFilesProcessed = () => {
+    return files.vendedor && files.comprador && files.ficha &&
+           processingStatus?.vendedor === 'success' &&
+           processingStatus?.comprador === 'success' &&
+           processingStatus?.ficha === 'success'
+  }
+
+  // Verificar si hay al menos una imagen procesada (exitosa o con error)
+  const hasProcessedFiles = () => {
+    return Object.keys(files).some(key => {
+      const type = key as keyof typeof files
+      const status = processingStatus?.[type]
+      return files[type] && (status === 'success' || status === 'error')
+    })
+  }
+
+  const hasFiles = () => {
+    return Object.keys(files).some(key => files[key as keyof typeof files])
   }
 
   // Componente modal para selector de fuente de imagen
@@ -135,20 +148,79 @@ export default function UploadBox({ onFilesUploaded, onManualFill }: UploadBoxPr
     description: string, 
     icon: React.ComponentType<any>, 
     file?: File 
-  }) => (
+  }) => {
+    const status = processingStatus?.[type] || 'idle'
+    const isProcessing = status === 'processing'
+    const hasError = status === 'error'
+    const isSuccess = status === 'success'
+    
+    return (
     <div className={`relative rounded-xl border-2 border-dashed p-6 text-center transition-all duration-300 min-h-[200px] touch-manipulation
-      ${file ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-accent active:bg-accent/80'}`}>
+      ${isProcessing ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20' : 
+        hasError ? 'border-red-500 bg-red-50 dark:bg-red-950/20' :
+        isSuccess ? 'border-green-500 bg-green-50 dark:bg-green-950/20' :
+        file ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-accent active:bg-accent/80'}`}>
+      
+      {/* Processing Overlay */}
+      {isProcessing && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm rounded-xl flex items-center justify-center z-10">
+          <div className="text-center space-y-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto"></div>
+            <p className="text-sm font-medium text-primary">
+              {type === 'vendedor' ? 'Procesando DNI del vendedor...' :
+               type === 'comprador' ? 'Procesando DNI del comprador...' :
+               'Procesando ficha técnica...'}
+            </p>
+          </div>
+        </div>
+      )}
       
       <button
-        onClick={() => openImageSelector(type)}
-        className="cursor-pointer block h-full w-full flex flex-col justify-center min-h-[148px] text-center"
+        onClick={() => !isProcessing && openImageSelector(type)}
+        disabled={isProcessing}
+        className={`block h-full w-full flex flex-col justify-center min-h-[148px] text-center ${
+          isProcessing ? 'cursor-not-allowed' : 'cursor-pointer'
+        }`}
       >
         <Icon className={`mx-auto h-12 w-12 mb-4 transition-colors ${
+          isProcessing ? 'text-blue-500' :
+          hasError ? 'text-red-500' :
+          isSuccess ? 'text-green-600' :
           file ? 'text-primary' : 'text-muted-foreground'
         }`} />
         <h3 className="text-lg font-semibold text-foreground mb-1">{title}</h3>
         <p className="text-sm text-muted-foreground mb-3">{description}</p>
-        {file ? (
+        
+        {isProcessing ? (
+          <div className="inline-flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/50 px-3 py-1 text-sm font-medium text-blue-700 dark:text-blue-300 mx-auto">
+            <div className="animate-spin rounded-full h-3 w-3 border border-blue-600 border-t-transparent mr-2"></div>
+            <span>Procesando imagen...</span>
+          </div>
+        ) : hasError ? (
+          <div className="space-y-2">
+            <div className="inline-flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900/50 px-3 py-1 text-sm font-medium text-red-700 dark:text-red-300 mx-auto">
+              <AlertTriangle className="mr-2 h-4 w-4 flex-shrink-0" />
+              <span>Error al procesar</span>
+            </div>
+            {onRetry && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRetry(type)
+                }}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+              >
+                <Upload className="h-3 w-3" />
+                Reintentar
+              </button>
+            )}
+          </div>
+        ) : isSuccess ? (
+          <div className="inline-flex items-center justify-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700 dark:bg-green-900/50 dark:text-green-300 mx-auto max-w-full">
+            <CheckCircle2 className="mr-2 h-4 w-4 flex-shrink-0" />
+            <span>Procesado correctamente</span>
+          </div>
+        ) : file ? (
           <div className="inline-flex items-center justify-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700 dark:bg-green-900/50 dark:text-green-300 mx-auto max-w-full">
             <CheckCircle2 className="mr-2 h-4 w-4 flex-shrink-0" />
             <span className="truncate">{file.name}</span>
@@ -166,7 +238,8 @@ export default function UploadBox({ onFilesUploaded, onManualFill }: UploadBoxPr
         )}
       </button>
     </div>
-  )
+    )
+  }
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -231,20 +304,23 @@ export default function UploadBox({ onFilesUploaded, onManualFill }: UploadBoxPr
       </div>
 
       <div className="text-center space-y-4">
-        <button
-          onClick={handleSubmit}
-          disabled={Object.keys(files).length === 0}
-          className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8 min-h-[44px] touch-manipulation"
-        >
-          <Upload className="mr-2 h-5 w-5" />
-          Procesar Documentos
-        </button>
+        {hasProcessedFiles() && showContinueButton && !allThreeFilesProcessed() && (
+          <button
+            onClick={onContinue}
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8 min-h-[44px] touch-manipulation"
+          >
+            <Upload className="mr-2 h-5 w-5" />
+            Continuar con los datos actuales
+          </button>
+        )}
         
-        <div className="flex items-center gap-4">
-          <div className="flex-1 h-px bg-border"></div>
-          <span className="text-sm text-muted-foreground">o</span>
-          <div className="flex-1 h-px bg-border"></div>
-        </div>
+        {hasFiles() && (
+          <div className="flex items-center gap-4">
+            <div className="flex-1 h-px bg-border"></div>
+            <span className="text-sm text-muted-foreground">o</span>
+            <div className="flex-1 h-px bg-border"></div>
+          </div>
+        )}
         
         <button
           onClick={onManualFill}

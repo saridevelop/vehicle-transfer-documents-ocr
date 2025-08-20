@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import toast from 'react-hot-toast'
 import { Upload } from 'lucide-react'
 import { useDebounce } from 'use-debounce'
 import { DocumentData } from '@/lib/types'
@@ -28,42 +29,47 @@ export default function EditableForm({
   // Maneja la subida de una nueva foto para una sección específica
   const handleSectionPhotoUpload = async (section: 'vendedor' | 'comprador' | 'vehiculo', file: File) => {
     setIsUploading(true)
+    setUploadingSection(section)
     try {
-      const formData = new FormData()
       // El API espera 'ficha' para el vehículo, no 'vehiculo'
       const fieldName = section === 'vehiculo' ? 'ficha' : section
-      formData.append(fieldName, file)
       
       console.log(`Uploading ${section} with field name: ${fieldName}`)
       
-      const response = await fetch('/api/process', {
+      const imageFormData = new FormData()
+      imageFormData.append('image', file)
+      imageFormData.append('type', fieldName)
+
+      const response = await fetch('/api/process-image', {
         method: 'POST',
-        body: formData
+        body: imageFormData
       })
       if (!response.ok) throw new Error('Error al procesar la imagen')
-      const data = await response.json()
+      const result = await response.json()
       
-      console.log('OCR Response:', data)
+      console.log('OCR Response:', result)
       
       // Solo actualiza la sección correspondiente
       setFormData(prev => ({
         ...prev,
-        [section]: data[section] || {}
+        [section]: result.data || {}
       }))
       if (onDataUpdate) {
         // Usar el nuevo estado actualizado
         setFormData(prev => {
           const updated = {
             ...prev,
-            [section]: data[section] || {}
+            [section]: result.data || {}
           }
           onDataUpdate(updated)
           return updated
         })
       }
+      
+      toast.success(`${section === 'vehiculo' ? 'Ficha técnica' : 'DNI'} procesado correctamente`)
     } catch (e) {
       console.error('Error uploading section photo:', e)
-      alert('Error al procesar la imagen. Intenta de nuevo.')
+      toast.error('Error al procesar la imagen. Intenta de nuevo.')
     } finally {
       setIsUploading(false)
       setUploadingSection(null)
@@ -302,7 +308,7 @@ export default function EditableForm({
       const url = URL.createObjectURL(blob)
       setPreviewPdf(url)
     } catch (error) {
-      alert('Error al generar la previsualización')
+      toast.error('Error al generar la previsualización')
     } finally {
       setIsGeneratingPreview(false)
     }
@@ -332,7 +338,7 @@ export default function EditableForm({
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (error) {
-      alert('Error al generar el archivo XML')
+      toast.error('Error al generar el archivo XML')
     }
   }
 
@@ -351,9 +357,22 @@ export default function EditableForm({
         title="Datos del Vendedor"
         icon={UserCircle}
         uploadButton={
-          <label className="inline-flex items-center gap-2 cursor-pointer text-primary hover:underline bg-background px-2 py-1 rounded shadow-sm border border-border">
-            <Upload className="h-4 w-4" />
-            <span className="hidden sm:inline">Subir foto de DNI</span>
+          <label className={`inline-flex items-center gap-2 cursor-pointer px-3 py-2 rounded-md border transition-colors ${
+            uploadingSection === 'vendedor' && isUploading
+              ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-500 text-blue-700 dark:text-blue-300'
+              : 'text-primary hover:bg-accent hover:text-accent-foreground bg-background border-border'
+          } ${isUploading ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+            {uploadingSection === 'vendedor' && isUploading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
+                <span className="text-sm">Procesando DNI...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4" />
+                <span className="text-sm">Subir foto de DNI</span>
+              </>
+            )}
             <input
               type="file"
               accept="image/*"
@@ -362,7 +381,6 @@ export default function EditableForm({
               onChange={e => {
                 const file = e.target.files?.[0]
                 if (file) {
-                  setUploadingSection('vendedor')
                   handleSectionPhotoUpload('vendedor', file)
                 }
                 e.target.value = ''
@@ -371,9 +389,6 @@ export default function EditableForm({
           </label>
         }
       >
-        {uploadingSection === 'vendedor' && isUploading && (
-          <span className="ml-2 text-xs text-muted-foreground absolute right-0 top-8">Procesando...</span>
-        )}
         <InputField
           id="vendedor-nombre"
           label="Nombre completo"
@@ -414,9 +429,22 @@ export default function EditableForm({
         title="Datos del Comprador"
         icon={UserCircle}
         uploadButton={
-          <label className="inline-flex items-center gap-2 cursor-pointer text-primary hover:underline bg-background px-2 py-1 rounded shadow-sm border border-border">
-            <Upload className="h-4 w-4" />
-            <span className="hidden sm:inline">Subir foto de DNI</span>
+          <label className={`inline-flex items-center gap-2 cursor-pointer px-3 py-2 rounded-md border transition-colors ${
+            uploadingSection === 'comprador' && isUploading
+              ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-500 text-blue-700 dark:text-blue-300'
+              : 'text-primary hover:bg-accent hover:text-accent-foreground bg-background border-border'
+          } ${isUploading ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+            {uploadingSection === 'comprador' && isUploading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
+                <span className="text-sm">Procesando DNI...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4" />
+                <span className="text-sm">Subir foto de DNI</span>
+              </>
+            )}
             <input
               type="file"
               accept="image/*"
@@ -425,7 +453,6 @@ export default function EditableForm({
               onChange={e => {
                 const file = e.target.files?.[0]
                 if (file) {
-                  setUploadingSection('comprador')
                   handleSectionPhotoUpload('comprador', file)
                 }
                 e.target.value = ''
@@ -434,9 +461,6 @@ export default function EditableForm({
           </label>
         }
       >
-        {uploadingSection === 'comprador' && isUploading && (
-          <span className="ml-2 text-xs text-muted-foreground absolute right-0 top-8">Procesando...</span>
-        )}
         <InputField
           id="comprador-nombre"
           label="Nombre completo"
@@ -477,9 +501,22 @@ export default function EditableForm({
         title="Datos del Vehículo"
         icon={Car}
         uploadButton={
-          <label className="inline-flex items-center gap-2 cursor-pointer text-primary hover:underline bg-background px-2 py-1 rounded shadow-sm border border-border">
-            <Upload className="h-4 w-4" />
-            <span className="hidden sm:inline">Subir foto de ficha</span>
+          <label className={`inline-flex items-center gap-2 cursor-pointer px-3 py-2 rounded-md border transition-colors ${
+            uploadingSection === 'vehiculo' && isUploading
+              ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-500 text-blue-700 dark:text-blue-300'
+              : 'text-primary hover:bg-accent hover:text-accent-foreground bg-background border-border'
+          } ${isUploading ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+            {uploadingSection === 'vehiculo' && isUploading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
+                <span className="text-sm">Procesando ficha técnica...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4" />
+                <span className="text-sm">Subir foto de ficha</span>
+              </>
+            )}
             <input
               type="file"
               accept="image/*"
@@ -488,7 +525,6 @@ export default function EditableForm({
               onChange={e => {
                 const file = e.target.files?.[0]
                 if (file) {
-                  setUploadingSection('vehiculo')
                   handleSectionPhotoUpload('vehiculo', file)
                 }
                 e.target.value = ''
@@ -497,9 +533,6 @@ export default function EditableForm({
           </label>
         }
       >
-        {uploadingSection === 'vehiculo' && isUploading && (
-          <span className="ml-2 text-xs text-muted-foreground absolute right-0 top-8">Procesando...</span>
-        )}
         <InputField
           id="vehiculo-marca"
           label="Marca (D.1)"
